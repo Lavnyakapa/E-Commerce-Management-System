@@ -16,8 +16,11 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v5
 
+      - name: Grant execute permission for Maven wrapper
+        run: chmod +x mvnw
+
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
