@@ -1,9 +1,7 @@
-package org.example.ecommercemanagementsystem.serviceimpl;
+package org.example.ecommercemanagementsystem.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.ecommercemanagementsystem.dto.CartDeleteResponse;
 import org.example.ecommercemanagementsystem.dto.CartItemResponse;
-import org.example.ecommercemanagementsystem.dto.CartRequest;
 import org.example.ecommercemanagementsystem.dto.CartResponse;
 import org.example.ecommercemanagementsystem.entity.CartEntity;
 import org.example.ecommercemanagementsystem.entity.CartItemEntity;
@@ -14,12 +12,12 @@ import org.example.ecommercemanagementsystem.repository.CartRepository;
 import org.example.ecommercemanagementsystem.repository.ProductVariantRepository;
 import org.example.ecommercemanagementsystem.repository.UserRepository;
 import org.example.ecommercemanagementsystem.service.CartService;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,124 +29,257 @@ public class CartServiceImpl implements CartService {
     private final UserRepository userRepository;
     private final ProductVariantRepository productVariantRepository;
 
-    // ---------------- CREATE CART ----------------
     @Override
-    public CartResponse createCart(CartRequest request) {
+    public CartResponse addToCart(
+            Long variantId,
+            Integer quantity
+    ) {
 
-        UserEntity user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        CartEntity cart = new CartEntity();
-        cart.setUser(user);
-        cart.setCartItems(new ArrayList<>());
-
-        cart = cartRepository.save(cart);
-
-        return mapToResponse(cart);
-    }
-
-    // ---------------- GET BY ID ----------------
-    @Override
-    public CartResponse getCartById(Long cartId) {
-
-        CartEntity cart = cartRepository.findById(cartId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
-
-        return mapToResponse(cart);
-    }
-
-    // ---------------- GET BY USER ----------------
-    @Override
-    public CartResponse getCartByUserId(Long userId) {
-
-        CartEntity cart = cartRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
-
-        return mapToResponse(cart);
-    }
-
-    // ---------------- GET ALL ----------------
-    @Override
-    public List<CartResponse> getAllCarts() {
-
-        return cartRepository.findAll()
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
-    // ---------------- DELETE CART ----------------
-    @Override
-    public CartDeleteResponse deleteCart(Long cartId) {
-
-        CartEntity cart = cartRepository.findById(cartId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
-
-        cartRepository.delete(cart);
-
-        return CartDeleteResponse.builder()
-                .cartId(cartId)
-                .message("Cart deleted successfully")
-                .build();
-    }
-
-    // ---------------- ADD ITEM ----------------
-    @Override
-    public CartResponse addItemToCart(Long userId, Long variantId, Integer quantity) {
-
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        ProductVariantEntity variant = productVariantRepository.findById(variantId)
-                .orElseThrow(() -> new RuntimeException("Variant not found"));
-
-        CartEntity cart = cartRepository.findByUserUserId(userId)
-                .orElseGet(() -> {
-                    CartEntity newCart = new CartEntity();
-                    newCart.setUser(user);
-                    newCart.setCartItems(new ArrayList<>());
-                    return cartRepository.save(newCart);
-                });
-
-        for (CartItemEntity item : cart.getCartItems()) {
-            if (item.getProductVariant().getVariantId().equals(variantId)) {
-                item.setQuantity(item.getQuantity() + quantity);
-                cartRepository.save(cart);
-                return mapToResponse(cart);
-            }
+        if (quantity == null || quantity <= 0) {
+            throw new RuntimeException(
+                    "Quantity must be greater than zero"
+            );
         }
 
-        CartItemEntity newItem = new CartItemEntity();
-        newItem.setCart(cart);
-        newItem.setProductVariant(variant);
-        newItem.setQuantity(quantity);
+        // Get logged-in username/email from JWT
+        String email = SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getName();
 
-        cart.getCartItems().add(newItem);
+        // Find user
+        UserEntity user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "User not found"
+                        )
+                );
 
-        cartRepository.save(cart);
+        // Find variant
+        ProductVariantEntity variant =
+                productVariantRepository
+                        .findById(variantId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Product variant not found"
+                                )
+                        );
 
-        return mapToResponse(cart);
+        // Check stock
+        if (variant.getStockQuantity() == null ||
+                variant.getStockQuantity() <= 0) {
+
+            throw new RuntimeException(
+                    "Product is out of stock"
+            );
+        }
+
+        // Get existing cart or create new cart
+        CartEntity cart =
+                cartRepository
+                        .findByUserUserId(user.getUserId())
+                        .orElseGet(() -> {
+
+                            CartEntity newCart =
+                                    new CartEntity();
+
+                            newCart.setUser(user);
+
+                            newCart.setCartItems(
+                                    new ArrayList<>()
+                            );
+
+                            return cartRepository.save(newCart);
+                        });
+
+        // Check if variant already exists in cart
+        CartItemEntity cartItem =
+                cartItemRepository
+                        .findByCartAndProductVariant(
+                                cart,
+                                variant
+                        )
+                        .orElse(null);
+
+        if (cartItem != null) {
+
+            int newQuantity =
+                    cartItem.getQuantity() + quantity;
+
+            // Prevent adding more than stock
+            if (newQuantity >
+                    variant.getStockQuantity()) {
+
+                throw new RuntimeException(
+                        "Requested quantity exceeds available stock"
+                );
+            }
+
+            cartItem.setQuantity(newQuantity);
+
+        } else {
+
+            if (quantity >
+                    variant.getStockQuantity()) {
+
+                throw new RuntimeException(
+                        "Requested quantity exceeds available stock"
+                );
+            }
+
+            cartItem =
+                    new CartItemEntity();
+
+            cartItem.setCart(cart);
+            cartItem.setProductVariant(variant);
+            cartItem.setQuantity(quantity);
+
+            cart.getCartItems().add(cartItem);
+        }
+
+        cartItemRepository.save(cartItem);
+
+        return buildCartResponse(
+                cart,
+                "Product added to cart successfully"
+        );
     }
-    // ---------------- UPDATE ITEM ----------------
-    @Override
-    public CartResponse updateCartItem(Long cartItemId, Integer quantity) {
 
-        CartItemEntity item = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+    @Override
+    @Transactional(readOnly = true)
+    public CartResponse getMyCart() {
+
+        String email = getLoggedInEmail();
+
+        UserEntity user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
+
+        CartEntity cart =
+                cartRepository
+                        .findByUserUserId(user.getUserId())
+                        .orElse(null);
+
+        if (cart == null) {
+            return new CartResponse(
+                    null,
+                    "Cart is empty",
+                    new ArrayList<>(),
+                    0.0
+            );
+        }
+
+        return buildCartResponse(
+                cart,
+                "Cart fetched successfully"
+        );
+    }
+
+    @Override
+    public CartResponse updateQuantity(
+            Long cartItemId,
+            Integer quantity
+    ) {
+
+        if (quantity == null || quantity <= 0) {
+            throw new RuntimeException(
+                    "Quantity must be greater than zero"
+            );
+        }
+
+        String email = getLoggedInEmail();
+
+        UserEntity user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
+
+        CartItemEntity item =
+                cartItemRepository
+                        .findById(cartItemId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Cart item not found"
+                                )
+                        );
+
+        // Security check:
+        // cart item must belong to logged-in user
+        if (!item.getCart()
+                .getUser()
+                .getUserId()
+                .equals(user.getUserId())) {
+
+            throw new RuntimeException(
+                    "You cannot modify this cart item"
+            );
+        }
+
+        ProductVariantEntity variant =
+                item.getProductVariant();
+
+        if (quantity >
+                variant.getStockQuantity()) {
+
+            throw new RuntimeException(
+                    "Requested quantity exceeds available stock"
+            );
+        }
 
         item.setQuantity(quantity);
 
         cartItemRepository.save(item);
 
-        return mapToResponse(item.getCart());
+        return buildCartResponse(
+                item.getCart(),
+                "Cart quantity updated successfully"
+        );
     }
 
-    // ---------------- REMOVE ITEM ----------------
     @Override
-    public CartResponse removeCartItem(Long cartItemId) {
+    public CartResponse removeFromCart(
+            Long cartItemId
+    ) {
 
-        CartItemEntity item = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+        String email = getLoggedInEmail();
+
+        UserEntity user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
+
+        CartItemEntity item =
+                cartItemRepository
+                        .findById(cartItemId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Cart item not found"
+                                )
+                        );
+
+        if (!item.getCart()
+                .getUser()
+                .getUserId()
+                .equals(user.getUserId())) {
+
+            throw new RuntimeException(
+                    "You cannot remove this cart item"
+            );
+        }
 
         CartEntity cart = item.getCart();
 
@@ -156,57 +287,130 @@ public class CartServiceImpl implements CartService {
 
         cartItemRepository.delete(item);
 
-        return mapToResponse(cart);
+        return buildCartResponse(
+                cart,
+                "Product removed from cart"
+        );
     }
 
-    // ---------------- CLEAR CART ----------------
     @Override
-    public void clearCart(Long userId) {
+    public CartResponse clearCart() {
 
-        CartEntity cart = cartRepository.findByUserUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+        String email = getLoggedInEmail();
 
-        cartItemRepository.deleteAll(cart.getCartItems());
+        UserEntity user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found"
+                                )
+                        );
+
+        CartEntity cart =
+                cartRepository
+                        .findByUserUserId(user.getUserId())
+                        .orElse(null);
+
+        if (cart == null) {
+            return new CartResponse(
+                    null,
+                    "Cart is already empty",
+                    new ArrayList<>(),
+                    0.0
+            );
+        }
 
         cart.getCartItems().clear();
 
         cartRepository.save(cart);
+
+        return new CartResponse(
+                cart.getCartId(),
+                "Cart cleared successfully",
+                new ArrayList<>(),
+                0.0
+        );
     }
 
-    // ---------------- MAPPER ----------------
-    private CartResponse mapToResponse(CartEntity cart) {
+    private String getLoggedInEmail() {
 
-        CartResponse response = new CartResponse();
+        return SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getName();
+    }
 
-        // Cart Details
-        response.setCartId(cart.getCartId());
-        response.setCreatedAt(cart.getCreatedAt());
-        response.setUpdatedAt(cart.getUpdatedAt());
+    private CartResponse buildCartResponse(
+            CartEntity cart,
+            String message
+    ) {
 
-        // User Details
-        if (cart.getUser() != null) {
-            response.setUserId(cart.getUser().getUserId());
-            response.setFirstName(cart.getUser().getFirstName());
-            response.setLastName(cart.getUser().getLastName());
-            response.setEmail(cart.getUser().getEmail());
+        List<CartItemResponse> items =
+                new ArrayList<>();
+
+        double total = 0.0;
+
+        for (CartItemEntity item :
+                cart.getCartItems()) {
+
+            ProductVariantEntity variant =
+                    item.getProductVariant();
+
+            double price =
+                    variant.getPrice() == null
+                            ? 0.0
+                            : variant.getPrice();
+
+            double subtotal =
+                    price * item.getQuantity();
+
+            CartItemResponse response =
+                    new CartItemResponse();
+
+            response.setCartItemId(
+                    item.getCartItemId()
+            );
+
+            response.setVariantId(
+                    variant.getVariantId()
+            );
+
+            response.setProductId(
+                    variant.getProduct()
+                            .getProductId()
+            );
+
+            response.setProductName(
+                    variant.getProduct()
+                            .getProductName()
+            );
+
+            response.setBrand(
+                    variant.getProduct()
+                            .getBrand()
+            );
+
+            response.setPrice(price);
+
+            response.setQuantity(
+                    item.getQuantity()
+            );
+
+            response.setSubtotal(
+                    subtotal
+            );
+
+            items.add(response);
+
+            total += subtotal;
         }
 
-        // Cart Items
-        List<CartItemResponse> items = cart.getCartItems()
-                .stream()
-                .map(item -> {
-                    CartItemResponse dto = new CartItemResponse();
-
-                    dto.setCartItemId(item.getCartItemId());
-                    dto.setVariantId(item.getProductVariant().getVariantId());
-                    dto.setQuantity(item.getQuantity());
-
-                    return dto;
-                })
-                .collect(Collectors.toList());
-
-        response.setItems(items);
-
-        return response;
+        return new CartResponse(
+                cart.getCartId(),
+                message,
+                items,
+                total
+        );
     }
 }

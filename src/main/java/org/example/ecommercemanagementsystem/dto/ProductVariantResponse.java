@@ -5,12 +5,17 @@ import lombok.Data;
 @Data
 public class ProductVariantResponse {
 
+    private Long variantId;
+
     private String sku;
+
     private String color;
+
     private String size;
-    private String storage;
+
     private Double price;
-    private Double discountPrice;
+
     private Integer stockQuantity;
-    private Double weight;
+
+    private String status;
 }

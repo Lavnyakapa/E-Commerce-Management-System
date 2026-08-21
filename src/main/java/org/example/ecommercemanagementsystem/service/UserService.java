@@ -3,18 +3,39 @@ package org.example.ecommercemanagementsystem.service;
 import org.example.ecommercemanagementsystem.dto.UserDeleteResponse;
 import org.example.ecommercemanagementsystem.dto.UserRequest;
 import org.example.ecommercemanagementsystem.dto.UserResponse;
+import org.example.ecommercemanagementsystem.entity.UserStatus;
 
 import java.util.List;
 
 public interface UserService {
 
-    UserResponse createUser(UserRequest request);
+    // Create
+    UserResponse createUser(
+            UserRequest request
+    );
 
-    UserResponse getUserById(Long userId);
+    // Get by ID
+    UserResponse getUserById(
+            Long userId
+    );
 
+    // Get all
     List<UserResponse> getAllUsers();
 
-    UserResponse updateUser(Long userId, UserRequest request);
+    // Update
+    UserResponse updateUser(
+            Long userId,
+            UserRequest request
+    );
 
-    UserDeleteResponse deleteUser(Long userId);
+    // Activate / Deactivate / Block
+    UserResponse updateUserStatus(
+            Long userId,
+            UserStatus status
+    );
+
+    // Delete
+    UserDeleteResponse deleteUser(
+            Long userId
+    );
 }

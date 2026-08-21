@@ -1,0 +1,32 @@
+.categories-container {
+    width: 90%;
+    margin: 30px auto;
+}
+
+.categories-container h1 {
+    margin-bottom: 20px;
+    color: #1e293b;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+th {
+    background-color: #2563eb;
+    color: white;
+    padding: 12px;
+}
+
+td {
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
+}
+
+tr:hover {
+    background-color: #f1f5f9;
+}

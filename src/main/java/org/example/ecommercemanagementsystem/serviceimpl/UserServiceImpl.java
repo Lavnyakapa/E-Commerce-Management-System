@@ -12,6 +12,7 @@ import org.example.ecommercemanagementsystem.exception.UserNotFoundException;
 import org.example.ecommercemanagementsystem.repository.RoleRepository;
 import org.example.ecommercemanagementsystem.repository.UserRepository;
 import org.example.ecommercemanagementsystem.service.UserService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,42 +24,95 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+
+
+    // =========================================
+    // CREATE USER
+    // =========================================
 
     @Override
-    public UserResponse createUser(UserRequest request) {
+    public UserResponse createUser(
+            UserRequest request
+    ) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+        if (userRepository.existsByEmail(
+                request.getEmail()
+        )) {
+
+            throw new RuntimeException(
+                    "Email already exists"
+            );
         }
 
-        RoleEntity role = roleRepository.findById(request.getRoleId())
-                .orElseThrow(() ->
+        RoleEntity role =
+                roleRepository.findById(
+                        request.getRoleId()
+                ).orElseThrow(() ->
                         new RoleNotFoundException(
-                                "Role not found with id: " + request.getRoleId()));
+                                "Role not found with id: "
+                                        + request.getRoleId()
+                        )
+                );
 
         UserEntity user = new UserEntity();
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
-        user.setRole(role);
-        user.setStatus(UserStatus.ACTIVE);
 
-        UserEntity savedUser = userRepository.save(user);
+        user.setFirstName(
+                request.getFirstName()
+        );
+
+        user.setLastName(
+                request.getLastName()
+        );
+
+        user.setEmail(
+                request.getEmail()
+        );
+
+        user.setPassword(
+                passwordEncoder.encode(
+                        request.getPassword()
+                )
+        );
+
+        user.setRole(role);
+
+        user.setStatus(
+                UserStatus.ACTIVE
+        );
+
+        UserEntity savedUser =
+                userRepository.save(user);
 
         return mapToResponse(savedUser);
     }
 
-    @Override
-    public UserResponse getUserById(Long userId) {
 
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new UserNotFoundException(
-                                "User not found with id: " + userId));
+    // =========================================
+    // GET USER BY ID
+    // =========================================
+
+    @Override
+    public UserResponse getUserById(
+            Long userId
+    ) {
+
+        UserEntity user =
+                userRepository.findById(userId)
+                        .orElseThrow(() ->
+                                new UserNotFoundException(
+                                        "User not found with id: "
+                                                + userId
+                                )
+                        );
 
         return mapToResponse(user);
     }
+
+
+    // =========================================
+    // GET ALL USERS
+    // =========================================
 
     @Override
     public List<UserResponse> getAllUsers() {
@@ -69,45 +123,131 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
     }
 
+
+    // =========================================
+    // UPDATE USER
+    // =========================================
+
     @Override
-    public UserResponse updateUser(Long userId, UserRequest request) {
+    public UserResponse updateUser(
+            Long userId,
+            UserRequest request
+    ) {
 
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new UserNotFoundException(
-                                "User not found with id: " + userId));
+        UserEntity user =
+                userRepository.findById(userId)
+                        .orElseThrow(() ->
+                                new UserNotFoundException(
+                                        "User not found with id: "
+                                                + userId
+                                )
+                        );
 
-        RoleEntity role = roleRepository.findById(request.getRoleId())
-                .orElseThrow(() ->
+        RoleEntity role =
+                roleRepository.findById(
+                        request.getRoleId()
+                ).orElseThrow(() ->
                         new RoleNotFoundException(
-                                "Role not found with id: " + request.getRoleId()));
+                                "Role not found with id: "
+                                        + request.getRoleId()
+                        )
+                );
 
-        // Optional: email duplicate check during update
-        if (!user.getEmail().equals(request.getEmail())
-                && userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+
+        // Check duplicate email
+
+        if (!user.getEmail().equals(
+                request.getEmail()
+        )
+                && userRepository.existsByEmail(
+                request.getEmail()
+        )) {
+
+            throw new RuntimeException(
+                    "Email already exists"
+            );
         }
 
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword());
+
+        user.setFirstName(
+                request.getFirstName()
+        );
+
+        user.setLastName(
+                request.getLastName()
+        );
+
+        user.setEmail(
+                request.getEmail()
+        );
+
+        user.setPassword(
+                passwordEncoder.encode(
+                        request.getPassword()
+                )
+        );
+
         user.setRole(role);
 
-        UserEntity updatedUser = userRepository.save(user);
+
+        UserEntity updatedUser =
+                userRepository.save(user);
 
         return mapToResponse(updatedUser);
     }
 
-    @Override
-    public UserDeleteResponse deleteUser(Long userId) {
 
-        UserEntity user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new UserNotFoundException(
-                                "User not found with id: " + userId));
+    // =========================================
+    // ACTIVATE / DEACTIVATE / BLOCK
+    // =========================================
+
+    @Override
+    public UserResponse updateUserStatus(
+            Long userId,
+            UserStatus status
+    ) {
+
+        UserEntity user =
+                userRepository.findById(userId)
+                        .orElseThrow(() ->
+                                new UserNotFoundException(
+                                        "User not found with id: "
+                                                + userId
+                                )
+                        );
+
+
+        user.setStatus(status);
+
+
+        UserEntity updatedUser =
+                userRepository.save(user);
+
+        return mapToResponse(updatedUser);
+    }
+
+
+    // =========================================
+    // DELETE USER
+    // =========================================
+
+    @Override
+    public UserDeleteResponse deleteUser(
+            Long userId
+    ) {
+
+        UserEntity user =
+                userRepository.findById(userId)
+                        .orElseThrow(() ->
+                                new UserNotFoundException(
+                                        "User not found with id: "
+                                                + userId
+                                )
+                        );
+
 
         userRepository.delete(user);
+
 
         return new UserDeleteResponse(
                 userId,
@@ -115,7 +255,14 @@ public class UserServiceImpl implements UserService {
         );
     }
 
-    private UserResponse mapToResponse(UserEntity user) {
+
+    // =========================================
+    // MAP ENTITY → RESPONSE
+    // =========================================
+
+    private UserResponse mapToResponse(
+            UserEntity user
+    ) {
 
         return UserResponse.builder()
                 .userId(user.getUserId())
@@ -123,10 +270,18 @@ public class UserServiceImpl implements UserService {
                 .lastName(user.getLastName())
                 .email(user.getEmail())
                 .status(user.getStatus())
-                .roleId(user.getRole().getRoleId())
-                .roleName(user.getRole().getRoleName())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
+                .roleId(
+                        user.getRole().getRoleId()
+                )
+                .roleName(
+                        user.getRole().getRoleName()
+                )
+                .createdAt(
+                        user.getCreatedAt()
+                )
+                .updatedAt(
+                        user.getUpdatedAt()
+                )
                 .build();
     }
 }

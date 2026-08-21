@@ -12,14 +12,30 @@ import lombok.NoArgsConstructor;
 public class CartItemResponse {
 
     private Long cartItemId;
+
     private Long cartId;
+
+    private Long productId;
+
     private Long variantId;
+
     private String productName;
+
+    private String brand;
+
     private String sku;
+
     private String color;
+
     private String size;
+
     private Double price;
+
     private Integer quantity;
+
     private Integer stockQuantity;
+
+    private Double subtotal;
+
     private Double totalPrice;
 }

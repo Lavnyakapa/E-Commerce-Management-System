@@ -33,9 +33,12 @@ public class PaymentEntity {
     @Column(nullable = false)
     private Double amount;
 
+    private String transactionId;
+
     private LocalDateTime paymentDate;
+
     @PrePersist
-    private void prePersist(){
+    private void prePersist() {
         paymentDate = LocalDateTime.now();
     }
 }

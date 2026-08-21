@@ -18,6 +18,11 @@ public class SubCategoryController {
 
     private final SubCategoryService subCategoryService;
 
+
+    // ============================================================
+    // CREATE
+    // ============================================================
+
     @PostMapping
     public ResponseEntity<SubCategoryResponse> createSubCategory(
             @RequestBody SubCategoryRequest request) {
@@ -28,6 +33,11 @@ public class SubCategoryController {
         );
     }
 
+
+    // ============================================================
+    // GET BY ID
+    // ============================================================
+
     @GetMapping("/{id}")
     public ResponseEntity<SubCategoryResponse> getSubCategoryById(
             @PathVariable Long id) {
@@ -37,13 +47,24 @@ public class SubCategoryController {
         );
     }
 
+
+    // ============================================================
+    // GET ALL
+    // ============================================================
+
     @GetMapping
-    public ResponseEntity<List<SubCategoryResponse>> getAllSubCategories() {
+    public ResponseEntity<List<SubCategoryResponse>>
+    getAllSubCategories() {
 
         return ResponseEntity.ok(
                 subCategoryService.getAllSubCategories()
         );
     }
+
+
+    // ============================================================
+    // UPDATE
+    // ============================================================
 
     @PutMapping("/{id}")
     public ResponseEntity<SubCategoryResponse> updateSubCategory(
@@ -51,22 +72,38 @@ public class SubCategoryController {
             @RequestBody SubCategoryRequest request) {
 
         return ResponseEntity.ok(
-                subCategoryService.updateSubCategory(id, request)
+                subCategoryService.updateSubCategory(
+                        id,
+                        request
+                )
         );
     }
 
 
+    // ============================================================
+    // GET BY NAME
+    // ============================================================
+
     @GetMapping("/name/{subCategoryName}")
-    public ResponseEntity<SubCategoryResponse> getSubCategoryByName(
+    public ResponseEntity<SubCategoryResponse>
+    getSubCategoryByName(
             @PathVariable String subCategoryName) {
 
         return ResponseEntity.ok(
-                subCategoryService.getSubCategoryByName(subCategoryName));
+                subCategoryService.getSubCategoryByName(
+                        subCategoryName
+                )
+        );
     }
 
+
+    // ============================================================
+    // DELETE
+    // ============================================================
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<SubCategoryDeleteResponse> deleteSubCategory(
-            @PathVariable Long id) {
+    public ResponseEntity<SubCategoryDeleteResponse>
+    deleteSubCategory(@PathVariable Long id) {
 
         return ResponseEntity.ok(
                 subCategoryService.deleteSubCategory(id)

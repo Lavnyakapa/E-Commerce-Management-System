@@ -1,0 +1,30 @@
+.wishlist-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.wishlist-btn:hover {
+    background: #ffffff;
+    transform: scale(1.05);
+}
+
+.add-to-cart-btn{
+    background-color: blue;
+    height:50px;
+    width: 150px;
+    font-size :15px;
+    color: white;;
+}

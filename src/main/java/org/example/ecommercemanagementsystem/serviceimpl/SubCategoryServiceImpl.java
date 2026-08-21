@@ -22,120 +22,259 @@ public class SubCategoryServiceImpl implements SubCategoryService {
     private final SubCategoryRepository subCategoryRepository;
     private final CategoryRepository categoryRepository;
 
-    // CREATE
+
+    // ============================================================
+    // CREATE SUBCATEGORY
+    // ============================================================
+
     @Override
     public SubCategoryResponse createSubCategory(SubCategoryRequest request) {
 
-        CategoryEntity category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+        // Check category ID
+        if (request.getCategoryId() == null) {
+            throw new RuntimeException("Category ID is required");
+        }
 
+        // Find category
+        CategoryEntity category = categoryRepository
+                .findById(request.getCategoryId())
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Category not found with id: "
+                                        + request.getCategoryId()
+                        )
+                );
+
+        // Create SubCategory
         SubCategoryEntity sc = new SubCategoryEntity();
+
         sc.setSubCategoryName(request.getSubCategoryName());
-        sc.setSubCategoryDescription(request.getSubCategoryDescription());
 
-        // ✅ Enum FIX
-        sc.setStatus(SubCategoryStatus.ACTIVE);
+        sc.setSubCategoryDescription(
+                request.getSubCategoryDescription()
+        );
 
+        // Set status
+        if (request.getStatus() != null) {
+            sc.setStatus(request.getStatus());
+        } else {
+            sc.setStatus(SubCategoryStatus.ACTIVE);
+        }
+
+        // Set category
         sc.setCategory(category);
 
-        SubCategoryEntity saved = subCategoryRepository.save(sc);
+        // Save
+        SubCategoryEntity saved =
+                subCategoryRepository.save(sc);
 
         return mapToResponse(saved);
     }
 
-    // GET BY ID
+
+    // ============================================================
+    // GET SUBCATEGORY BY ID
+    // ============================================================
+
     @Override
     public SubCategoryResponse getSubCategoryById(Long id) {
 
-        SubCategoryEntity sc = subCategoryRepository.findByIdWithCategory(id)
-                .orElseThrow(() -> new RuntimeException("SubCategory not found with id: " + id));
+        SubCategoryEntity sc =
+                subCategoryRepository
+                        .findByIdWithCategory(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "SubCategory not found with id: "
+                                                + id
+                                )
+                        );
 
         return mapToResponse(sc);
     }
 
-    // GET ALL
+
+    // ============================================================
+    // GET ALL SUBCATEGORIES
+    // ============================================================
+
     @Override
     public List<SubCategoryResponse> getAllSubCategories() {
 
-        return subCategoryRepository.findAll()
+        return subCategoryRepository
+                .findAll()
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    // GET BY CATEGORY NAME
-    @Override
-    public List<SubCategoryResponse> getSubCategoriesByCategoryName(String categoryName) {
 
-        return subCategoryRepository.findByCategoryCategoryName(categoryName)
+    // ============================================================
+    // GET SUBCATEGORIES BY CATEGORY NAME
+    // ============================================================
+
+    @Override
+    public List<SubCategoryResponse> getSubCategoriesByCategoryName(
+            String categoryName) {
+
+        return subCategoryRepository
+                .findByCategoryCategoryName(categoryName)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    // UPDATE
+
+    // ============================================================
+    // UPDATE SUBCATEGORY
+    // ============================================================
+
     @Override
-    public SubCategoryResponse updateSubCategory(Long id, SubCategoryRequest request) {
+    public SubCategoryResponse updateSubCategory(
+            Long id,
+            SubCategoryRequest request) {
 
-        SubCategoryEntity sc = subCategoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("SubCategory not found"));
+        // Find existing subcategory
+        SubCategoryEntity sc =
+                subCategoryRepository
+                        .findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "SubCategory not found with id: "
+                                                + id
+                                )
+                        );
 
-        sc.setSubCategoryName(request.getSubCategoryName());
-        sc.setSubCategoryDescription(request.getSubCategoryDescription());
+        // Update name
+        sc.setSubCategoryName(
+                request.getSubCategoryName()
+        );
 
+        // Update description
+        sc.setSubCategoryDescription(
+                request.getSubCategoryDescription()
+        );
+
+        // Update status
+        if (request.getStatus() != null) {
+            sc.setStatus(request.getStatus());
+        }
+
+        // Update category if categoryId is provided
         if (request.getCategoryId() != null) {
-            CategoryEntity category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new RuntimeException("Category not found"));
+
+            CategoryEntity category =
+                    categoryRepository
+                            .findById(request.getCategoryId())
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Category not found with id: "
+                                                    + request.getCategoryId()
+                                    )
+                            );
+
             sc.setCategory(category);
         }
 
-        SubCategoryEntity updated = subCategoryRepository.save(sc);
+        // Save updated subcategory
+        SubCategoryEntity updated =
+                subCategoryRepository.save(sc);
 
         return mapToResponse(updated);
     }
 
-    // DELETE
+
+    // ============================================================
+    // DELETE SUBCATEGORY
+    // ============================================================
+
     @Override
     public SubCategoryDeleteResponse deleteSubCategory(Long id) {
 
-        SubCategoryEntity sc = subCategoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("SubCategory not found with id: " + id));
+        SubCategoryEntity sc =
+                subCategoryRepository
+                        .findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "SubCategory not found with id: "
+                                                + id
+                                )
+                        );
 
         subCategoryRepository.delete(sc);
 
-        SubCategoryDeleteResponse response = new SubCategoryDeleteResponse();
+        SubCategoryDeleteResponse response =
+                new SubCategoryDeleteResponse();
+
         response.setSubCategoryId(id);
-        response.setMessage("SubCategory deleted successfully");
+
+        response.setMessage(
+                "SubCategory deleted successfully"
+        );
 
         return response;
     }
 
-    // GET BY NAME
-    @Override
-    public SubCategoryResponse getSubCategoryByName(String subCategoryName) {
 
-        SubCategoryEntity subCategory = subCategoryRepository
-                .findBySubCategoryName(subCategoryName)
-                .orElseThrow(() -> new RuntimeException("SubCategory not found"));
+    // ============================================================
+    // GET SUBCATEGORY BY NAME
+    // ============================================================
+
+    @Override
+    public SubCategoryResponse getSubCategoryByName(
+            String subCategoryName) {
+
+        SubCategoryEntity subCategory =
+                subCategoryRepository
+                        .findBySubCategoryName(subCategoryName)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "SubCategory not found"
+                                )
+                        );
 
         return mapToResponse(subCategory);
     }
 
+
+    // ============================================================
     // MAPPER
-    private SubCategoryResponse mapToResponse(SubCategoryEntity sc) {
+    // ============================================================
 
-        SubCategoryResponse response = new SubCategoryResponse();
+    private SubCategoryResponse mapToResponse(
+            SubCategoryEntity sc) {
 
-        response.setSubCategoryId(sc.getSubCategoryId());
-        response.setSubCategoryName(sc.getSubCategoryName());
-        response.setSubCategoryDescription(sc.getSubCategoryDescription());
+        SubCategoryResponse response =
+                new SubCategoryResponse();
 
-        // ✅ Enum → String FIX
-        response.setStatus(sc.getStatus().name());
+        response.setSubCategoryId(
+                sc.getSubCategoryId()
+        );
 
+        response.setSubCategoryName(
+                sc.getSubCategoryName()
+        );
+
+        response.setSubCategoryDescription(
+                sc.getSubCategoryDescription()
+        );
+
+        // Enum -> String
+        if (sc.getStatus() != null) {
+            response.setStatus(
+                    sc.getStatus().name()
+            );
+        }
+
+        // Category information
         if (sc.getCategory() != null) {
-            response.setCategoryId(sc.getCategory().getCategoryId());
-            response.setCategoryName(sc.getCategory().getCategoryName());
+
+            response.setCategoryId(
+                    sc.getCategory().getCategoryId()
+            );
+
+            response.setCategoryName(
+                    sc.getCategory().getCategoryName()
+            );
         }
 
         return response;

@@ -14,39 +14,103 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
 
+    // =========================================
+    // CREATE PAYMENT
+    // =========================================
+
     @Override
     public PaymentEntity createPayment(PaymentEntity payment) {
+
         return paymentRepository.save(payment);
     }
 
+    // =========================================
+    // GET ALL PAYMENTS
+    // =========================================
+
     @Override
     public List<PaymentEntity> getAllPayments() {
+
         return paymentRepository.findAll();
     }
 
+    // =========================================
+    // GET PAYMENT BY ID
+    // =========================================
+
     @Override
     public PaymentEntity getPaymentById(Long paymentId) {
+
         return paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Payment not found with id: "
+                                        + paymentId
+                        )
+                );
     }
 
+    // =========================================
+    // UPDATE PAYMENT
+    // =========================================
+
     @Override
-    public PaymentEntity updatePayment(Long paymentId, PaymentEntity payment) {
+    public PaymentEntity updatePayment(
+            Long paymentId,
+            PaymentEntity payment
+    ) {
 
-        PaymentEntity existingPayment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+        PaymentEntity existingPayment =
+                paymentRepository.findById(paymentId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Payment not found with id: "
+                                                + paymentId
+                                )
+                        );
 
-        existingPayment.setPaymentStatus(payment.getPaymentStatus());
-        existingPayment.setPaymentMethod(payment.getPaymentMethod());
-        existingPayment.setAmount(payment.getAmount());
-        existingPayment.setOrder(payment.getOrder());
+        /*
+         * Copy the fields from the request.
+         *
+         * IMPORTANT:
+         * Keep paymentId from the existing entity.
+         */
+
+        existingPayment.setPaymentMethod(
+                payment.getPaymentMethod()
+        );
+
+        existingPayment.setPaymentStatus(
+                payment.getPaymentStatus()
+        );
+
+        existingPayment.setAmount(
+                payment.getAmount()
+        );
+
+        existingPayment.setTransactionId(
+                payment.getTransactionId()
+        );
 
         return paymentRepository.save(existingPayment);
     }
 
+    // =========================================
+    // DELETE PAYMENT
+    // =========================================
+
     @Override
     public void deletePayment(Long paymentId) {
-        paymentRepository.deleteById(paymentId);
-    }
 
+        PaymentEntity existingPayment =
+                paymentRepository.findById(paymentId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Payment not found with id: "
+                                                + paymentId
+                                )
+                        );
+
+        paymentRepository.delete(existingPayment);
+    }
 }

@@ -7,7 +7,10 @@ import org.example.ecommercemanagementsystem.entity.SubCategoryStatus;
 public class SubCategoryRequest {
 
     private String subCategoryName;
+
     private String subCategoryDescription;
+
     private SubCategoryStatus status;
+
     private Long categoryId;
 }
