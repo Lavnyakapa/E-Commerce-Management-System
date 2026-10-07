@@ -27,3 +27,4 @@ public class CartItemEntity {
     @Column(nullable = false)
     private Integer quantity;
 }
+

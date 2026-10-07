@@ -11,7 +11,9 @@ function Login() {
 
     const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (
+        e: React.FormEvent
+    ) => {
 
         e.preventDefault();
 
@@ -27,7 +29,11 @@ function Login() {
             if (loginData.status === 200) {
 
                 console.log("Login successful");
-                console.log("Login response:", loginData.data);
+
+                console.log(
+                    "Login response:",
+                    loginData.data
+                );
 
                 // Store JWT token
                 localStorage.setItem(
@@ -38,16 +44,27 @@ function Login() {
                 // Store logged-in user information
                 localStorage.setItem(
                     "user",
-                    JSON.stringify(loginData.data)
+                    JSON.stringify(
+                        loginData.data
+                    )
                 );
 
-                // Navigate to products
+                // Notify CartContext and WishlistContext
+                // that the user has logged in
+                window.dispatchEvent(
+                    new Event("auth-changed")
+                );
+
+                // Navigate to Products
                 navigate("/products");
             }
 
         } catch (error: any) {
 
-            console.error("Login failed:", error);
+            console.error(
+                "Login failed:",
+                error
+            );
 
             if (error.response) {
 
@@ -72,10 +89,13 @@ function Login() {
 
                 <div className="login-header">
 
-                    <h1>Welcome Back</h1>
+                    <h1>
+                        Welcome Back
+                    </h1>
 
                     <p>
-                        Login to your E-Commerce Management System
+                        Login to your E-Commerce
+                        Management System
                     </p>
 
                 </div>
@@ -94,10 +114,12 @@ function Login() {
                                 type="email"
                                 id="email_"
                                 placeholder="Enter your email"
-                                onChange={(e) =>
-                                    setUserEmail(e.target.value)
-                                }
                                 value={userEmail}
+                                onChange={(e) =>
+                                    setUserEmail(
+                                        e.target.value
+                                    )
+                                }
                                 required
                             />
 
@@ -115,10 +137,12 @@ function Login() {
                             type="password"
                             id="password"
                             placeholder="Enter your password"
-                            onChange={(e) =>
-                                setPassword(e.target.value)
-                            }
                             value={password}
+                            onChange={(e) =>
+                                setPassword(
+                                    e.target.value
+                                )
+                            }
                             required
                         />
 
@@ -133,12 +157,14 @@ function Login() {
                     <div className="login-options">
 
                         <label>
+
                             <input
                                 type="checkbox"
                                 name="remember"
                             />
 
                             Remember me
+
                         </label>
 
                         <Link to="#">

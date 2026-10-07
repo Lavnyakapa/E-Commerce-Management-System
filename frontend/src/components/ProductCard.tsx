@@ -1,142 +1,883 @@
-import React, {useState, useMemo} from "react";
-import {Heart} from "lucide-react";
-import {useWishlist} from "../context/WishlistContext";
-import type {WishlistProduct} from "../context/WishlistContext";
+import React, {
+    useEffect,
+    useMemo,
+    useState
+} from "react";
+
+import { Heart } from "lucide-react";
+
+import {
+    useWishlist
+} from "../context/WishlistContext";
+
+import type {
+    WishlistProduct
+} from "../context/WishlistContext";
+
+import type {
+    Product
+} from "../services/productService";
+
 import "../styles/ProductCard.css";
 
+
 interface ProductCardProps {
-    product: WishlistProduct;
-    onAddToCart?: (product: WishlistProduct) => void;
+
+    product: Product;
+
+    onAddToCart?: (
+        product: Product
+    ) => void;
 }
 
-const ProductCard: React.FC<ProductCardProps> = React.memo(({product, onAddToCart}) => {
-    const {isInWishlist, toggleWishlist} = useWishlist();
-    const inWishlist = isInWishlist(product.productId);
-    const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
 
-    // Memoize price calculation
-    const price: number = useMemo(() => {
-        return product.variants && product.variants.length > 0
-            ? product.variants[0].price
-            : 0;
-    }, [product.variants]);
+/* =========================================================
+   BACKEND URL
+========================================================= */
 
-    // Gather all available images into a clean array
-    const imageUrls = useMemo(() => {
-        const p = product as unknown as Record<string, unknown>;
-        const rawImages: string[] = [];
+const BACKEND_URL =
+    "http://localhost:8080";
 
-        // Check if backend provides an array of images
-        if (Array.isArray(p.images)) {
-            p.images.forEach((img) => {
-                if (typeof img === "string" && img.trim().length > 0) rawImages.push(img.trim());
-            });
-        }
 
-        // Check individual string image fields
-        const singleFields = [product.imageUrl, product.imagePath, p.image, p.image_url, p.photo];
-        singleFields.forEach((field) => {
-            if (typeof field === "string" && field.trim().length > 0 && !rawImages.includes(field.trim())) {
-                rawImages.push(field.trim());
-            }
-        });
+/* =========================================================
+   CONVERT IMAGE PATH TO BROWSER URL
+========================================================= */
 
-        // If no images came from the backend, map multiple defaults based on product type
-        if (rawImages.length === 0) {
-            const name = (product.productName || "").toLowerCase();
-            if (name.includes("samsung") || name.includes("ultra") || name.includes("phone")) {
-                rawImages.push(
-                    "images/products/s25ultra-back.jpg",
-                    "images/products/s25ultra-front.jpg",
-                    "images/products/s25ultra-side.jpg"
-                );
-            } else if (name.includes("maybelline") || name.includes("foundation") || name.includes("cosmetics")) {
-                rawImages.push("images/cosmetics/fitme-foundation.jpg",
-                    "images/cosmetics/fitme-foundation1.jpg");
-            } else if (name.includes("shirt") || name.includes("cotton") || name.includes("clothing")) {
-                rawImages.push("images/products/mens-blue-shirt.jpg",
-                    "images/products/mens-blue-shirt_b.jpg");
-            }
-        }
+const getImageUrl = (
+    image: string
+): string => {
 
-        // Format paths into absolute URLs or keep relative path endpoints correctly
-        return rawImages.map((img) => {
-            if (img.startsWith("http://") || img.startsWith("https://") || img.startsWith("data:")) {
-                return img;
-            }
-            const cleanPath = img.startsWith("/") ? img : `/${img}`;
-            return `http://localhost:8080${cleanPath}`;
-        });
-    }, [product]);
+    const cleanImage =
+        image.trim();
 
-    // Current active image to display
-    const activeImageSrc = imageUrls[currentImageIndex] || "/placeholder.png";
+
+    if (!cleanImage) {
+
+        return "/placeholder.png";
+    }
+
+
+    /* -----------------------------------------------------
+       Already a complete URL
+    ----------------------------------------------------- */
+
+    if (
+        cleanImage.startsWith(
+            "http://"
+        ) ||
+        cleanImage.startsWith(
+            "https://"
+        ) ||
+        cleanImage.startsWith(
+            "data:"
+        ) ||
+        cleanImage.startsWith(
+            "blob:"
+        )
+    ) {
+
+        return cleanImage;
+    }
+
+
+    /* -----------------------------------------------------
+       Backend path beginning with /
+    ----------------------------------------------------- */
+
+    if (
+        cleanImage.startsWith("/")
+    ) {
+
+        return (
+            `${BACKEND_URL}${cleanImage}`
+        );
+    }
+
+
+    /* -----------------------------------------------------
+       Relative backend path
+    ----------------------------------------------------- */
 
     return (
-        <div className="product-card">
-            <div className="product-image-container">
-                <img
-                    src={activeImageSrc}
-                    alt={product.productName}
-                    className="product-image"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                        (e.currentTarget as HTMLImageElement).src = "/placeholder.png";
-                    }}
-                />
+        `${BACKEND_URL}/${cleanImage}`
+    );
+};
 
-                <button
-                    type="button"
-                    className={`wishlist-btn ${inWishlist ? "active" : ""}`}
-                    onClick={() => toggleWishlist(product)}
+
+/* =========================================================
+   FALLBACK IMAGES
+========================================================= */
+
+const getFallbackImages = (
+    productName: string
+): string[] => {
+
+    const name =
+        (
+            productName || ""
+        ).toLowerCase();
+
+
+    /* =====================================================
+       SAMSUNG GALAXY S25 ULTRA
+    ===================================================== */
+
+    if (
+        name.includes("samsung") ||
+        name.includes("galaxy") ||
+        name.includes("ultra") ||
+        name.includes("phone")
+    ) {
+
+        return [
+
+            "images/products/s25ultra-back.jpg",
+
+            "images/products/s25ultra-front.jpg",
+
+            "images/products/s25ultra-side.jpg"
+
+        ];
+    }
+
+
+    /* =====================================================
+       MAYBELLINE
+    ===================================================== */
+
+    if (
+        name.includes("maybelline") ||
+        name.includes("foundation") ||
+        name.includes("cosmetics")
+    ) {
+
+        return [
+
+            "images/cosmetics/fitme-foundation.jpg",
+
+            "images/cosmetics/fitme-foundation1.jpg"
+
+        ];
+    }
+
+
+    /* =====================================================
+       SHIRT
+    ===================================================== */
+
+    if (
+        name.includes("shirt") ||
+        name.includes("cotton") ||
+        name.includes("clothing")
+    ) {
+
+        return [
+
+            "images/products/mens-blue-shirt.jpg",
+
+            "images/products/mens-blue-shirt_b.jpg"
+
+        ];
+    }
+
+
+    /* =====================================================
+       SMART WATCH
+    ===================================================== */
+
+    if (
+        name.includes("watch") ||
+        name.includes("smartwatch") ||
+        name.includes("smart watch")
+    ) {
+
+        return [
+
+            "images/products/SmartWatch.jpg"
+
+        ];
+    }
+
+
+    return [];
+};
+
+
+/* =========================================================
+   COMPONENT
+========================================================= */
+
+const ProductCard: React.FC<ProductCardProps> = React.memo(
+    ({
+         product,
+         onAddToCart
+     }) => {
+
+
+        /* =====================================================
+           WISHLIST
+        ===================================================== */
+
+        const {
+            isInWishlist,
+            toggleWishlist
+        } = useWishlist();
+
+
+        const inWishlist =
+            isInWishlist(
+                product.productId
+            );
+
+
+        const wishlistProduct:
+            WishlistProduct = {
+
+            productId:
+            product.productId,
+
+            productName:
+            product.productName,
+
+            brand:
+            product.brand,
+
+            imageUrl:
+            product.imageUrl,
+
+            imagePath:
+            product.imagePath,
+
+            variants:
+                product.variants
+                    ? product.variants.map(
+                        variant => ({
+                            price:
+                            variant.price
+                        })
+                    )
+                    : []
+        };
+
+
+        /* =====================================================
+           IMAGE INDEX
+        ===================================================== */
+
+        const [
+            currentImageIndex,
+            setCurrentImageIndex
+        ] = useState(0);
+
+
+        /* =====================================================
+           FAILED IMAGES
+        ===================================================== */
+
+        const [
+            failedImages,
+            setFailedImages
+        ] = useState<
+            Record<string, boolean>
+        >({});
+
+
+        /* =====================================================
+           PRICE
+        ===================================================== */
+
+        const price =
+            useMemo(() => {
+
+                if (
+                    product.variants &&
+                    product.variants.length > 0
+                ) {
+
+                    return (
+                        product
+                            .variants[0]
+                            .price || 0
+                    );
+                }
+
+
+                return 0;
+
+            }, [
+                product.variants
+            ]);
+
+
+        /* =====================================================
+           COLLECT ALL IMAGE PATHS
+        ===================================================== */
+
+        const imageUrls =
+            useMemo(() => {
+
+                const p =
+                    product as unknown as Record<
+                        string,
+                        unknown
+                    >;
+
+
+                const images: string[] = [];
+
+
+                /* -------------------------------------------------
+                   ADD IMAGE
+                ------------------------------------------------- */
+
+                const addImage = (
+                    image: unknown
+                ) => {
+
+                    if (
+                        typeof image !==
+                        "string"
+                    ) {
+
+                        return;
+                    }
+
+
+                    const clean =
+                        image.trim();
+
+
+                    if (
+                        !clean
+                    ) {
+
+                        return;
+                    }
+
+
+                    if (
+                        !images.includes(
+                            clean
+                        )
+                    ) {
+
+                        images.push(
+                            clean
+                        );
+                    }
+                };
+
+
+                /* -------------------------------------------------
+                   images
+                ------------------------------------------------- */
+
+                if (
+                    Array.isArray(
+                        p.images
+                    )
+                ) {
+
+                    p.images.forEach(
+                        addImage
+                    );
+                }
+
+
+                /* -------------------------------------------------
+                   imageUrls
+                ------------------------------------------------- */
+
+                if (
+                    Array.isArray(
+                        p.imageUrls
+                    )
+                ) {
+
+                    p.imageUrls.forEach(
+                        addImage
+                    );
+                }
+
+
+                /* -------------------------------------------------
+                   imageUrl
+                ------------------------------------------------- */
+
+                addImage(
+                    product.imageUrl
+                );
+
+
+                /* -------------------------------------------------
+                   imagePath
+                ------------------------------------------------- */
+
+                addImage(
+                    product.imagePath
+                );
+
+
+                /* -------------------------------------------------
+                   Other possible fields
+                ------------------------------------------------- */
+
+                addImage(
+                    p.image
+                );
+
+                addImage(
+                    p.image_url
+                );
+
+                addImage(
+                    p.photo
+                );
+
+
+                /* -------------------------------------------------
+                   FALLBACK
+                ------------------------------------------------- */
+
+                if (
+                    images.length === 0
+                ) {
+
+                    return getFallbackImages(
+                        product.productName
+                    );
+                }
+
+
+                return images;
+
+            }, [
+                product
+            ]);
+
+
+        /* =====================================================
+           CONVERT TO ACTUAL BROWSER URLS
+        ===================================================== */
+
+        const browserImageUrls =
+            useMemo(() => {
+
+                return imageUrls.map(
+                    getImageUrl
+                );
+
+            }, [
+                imageUrls
+            ]);
+
+
+        /* =====================================================
+           AVAILABLE IMAGES
+        ===================================================== */
+
+        const availableImageUrls =
+            useMemo(() => {
+
+                const validImages =
+                    browserImageUrls.filter(
+                        image =>
+                            !failedImages[
+                                image
+                                ]
+                    );
+
+
+                /*
+                 * If API images failed,
+                 * try product-name fallback.
+                 */
+
+                if (
+                    validImages.length === 0
+                ) {
+
+                    const fallbackImages =
+                        getFallbackImages(
+                            product.productName
+                        );
+
+
+                    return fallbackImages
+                        .map(
+                            getImageUrl
+                        )
+                        .filter(
+                            image =>
+                                !failedImages[
+                                    image
+                                    ]
+                        );
+                }
+
+
+                return validImages;
+
+            }, [
+                browserImageUrls,
+                failedImages,
+                product.productName
+            ]);
+
+
+        /* =====================================================
+           CURRENT IMAGE
+        ===================================================== */
+
+        const activeImageSrc =
+            availableImageUrls[
+                currentImageIndex
+                ] ||
+            availableImageUrls[0] ||
+            "/placeholder.png";
+
+
+        /* =====================================================
+           RESET WHEN PRODUCT CHANGES
+        ===================================================== */
+
+        useEffect(() => {
+
+            setCurrentImageIndex(0);
+
+            setFailedImages({});
+
+        }, [
+            product.productId
+        ]);
+
+
+        /* =====================================================
+           IMAGE ERROR
+        ===================================================== */
+
+        const handleImageError = (
+            event: React.SyntheticEvent<
+                HTMLImageElement,
+                Event
+            >
+        ) => {
+
+            const image =
+                event.currentTarget;
+
+
+            const failedUrl =
+                image.src;
+
+
+            console.error(
+                "❌ IMAGE FAILED:",
+                failedUrl
+            );
+
+
+            setFailedImages(
+                previous => ({
+                    ...previous,
+                    [failedUrl]: true
+                })
+            );
+
+
+            setCurrentImageIndex(0);
+        };
+
+
+        /* =====================================================
+           ADD TO CART
+        ===================================================== */
+
+        const handleAddToCartClick =
+            () => {
+
+                if (
+                    !onAddToCart
+                ) {
+
+                    console.error(
+                        "❌ onAddToCart IS UNDEFINED"
+                    );
+
+
+                    alert(
+                        "Add to Cart function is not available."
+                    );
+
+
+                    return;
+                }
+
+
+                onAddToCart(
+                    product
+                );
+            };
+
+
+        /* =====================================================
+           WISHLIST
+        ===================================================== */
+
+        const handleWishlistClick =
+            async () => {
+
+                try {
+
+                    await toggleWishlist(
+                        wishlistProduct
+                    );
+
+                } catch (
+                    error
+                    ) {
+
+                    console.error(
+                        "❌ WISHLIST FAILED:",
+                        error
+                    );
+                }
+            };
+
+
+        /* =====================================================
+           RETURN
+        ===================================================== */
+
+        return (
+
+            <div className="product-card">
+
+
+                {/* =================================================
+                    IMAGE CONTAINER
+                ================================================= */}
+
+                <div
+                    className="product-image-container"
                 >
-                    <Heart fill={inWishlist ? "red" : "none"} color={inWishlist ? "red" : "currentColor"}/>
-                </button>
-            </div>
 
-            {/* Thumbnail selector if multiple images exist */}
-            {imageUrls.length > 1 && (
-                <div className="product-thumbnails"
-                     style={{display: "flex", gap: "6px", padding: "8px 12px", justifyContent: "center"}}>
-                    {imageUrls.map((url, idx) => (
-                        <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setCurrentImageIndex(idx)}
-                            style={{
-                                border: currentImageIndex === idx ? "2px solid #007bff" : "1px solid #ccc",
-                                padding: "2px",
-                                background: "transparent",
-                                cursor: "pointer",
-                                borderRadius: "4px"
-                            }}
-                        >
-                            <img src={url} alt=""
-                                 style={{width: "35px", height: "35px", objectFit: "cover", display: "block"}}/>
-                        </button>
-                    ))}
+                    <img
+                        src={
+                            activeImageSrc
+                        }
+                        alt={
+                            product.productName
+                        }
+                        className="product-image"
+                        onError={
+                            handleImageError
+                        }
+                    />
+
+
+                    {/* =================================================
+                        WISHLIST
+                    ================================================= */}
+
+                    <button
+                        type="button"
+                        className={
+                            `wishlist-btn ${
+                                inWishlist
+                                    ? "active"
+                                    : ""
+                            }`
+                        }
+                        onClick={
+                            handleWishlistClick
+                        }
+                        aria-label={
+                            inWishlist
+                                ? "Remove from wishlist"
+                                : "Add to wishlist"
+                        }
+                    >
+
+                        <Heart
+                            fill={
+                                inWishlist
+                                    ? "red"
+                                    : "none"
+                            }
+                            color={
+                                inWishlist
+                                    ? "red"
+                                    : "currentColor"
+                            }
+                        />
+
+                    </button>
+
                 </div>
-            )}
 
-            <div className="product-info">
-                <h3 className="product-name">{product.productName}</h3>
-                {product.brand && (
-                    <p className="product-brand">{product.brand}</p>
+
+                {/* =================================================
+                    THUMBNAILS
+                ================================================= */}
+
+                {availableImageUrls.length > 1 && (
+
+                    <div
+                        className="product-thumbnails"
+                        style={{
+                            display:
+                                "flex",
+
+                            gap:
+                                "6px",
+
+                            padding:
+                                "8px 12px",
+
+                            justifyContent:
+                                "center"
+                        }}
+                    >
+
+                        {availableImageUrls.map(
+                            (
+                                url,
+                                index
+                            ) => (
+
+                                <button
+                                    key={
+                                        `${url}-${index}`
+                                    }
+                                    type="button"
+                                    onClick={() =>
+                                        setCurrentImageIndex(
+                                            index
+                                        )
+                                    }
+                                    style={{
+                                        border:
+                                            currentImageIndex ===
+                                            index
+                                                ? "2px solid #007bff"
+                                                : "1px solid #ccc",
+
+                                        padding:
+                                            "2px",
+
+                                        background:
+                                            "transparent",
+
+                                        cursor:
+                                            "pointer",
+
+                                        borderRadius:
+                                            "4px"
+                                    }}
+                                >
+
+                                    <img
+                                        src={
+                                            url
+                                        }
+                                        alt=""
+                                        onError={
+                                            handleImageError
+                                        }
+                                        style={{
+                                            width:
+                                                "35px",
+
+                                            height:
+                                                "35px",
+
+                                            objectFit:
+                                                "cover",
+
+                                            display:
+                                                "block"
+                                        }}
+                                    />
+
+                                </button>
+                            )
+                        )}
+
+                    </div>
                 )}
-                <p className="product-price">${price.toFixed(2)}</p>
-                {onAddToCart && (
+
+
+                {/* =================================================
+                    PRODUCT INFO
+                ================================================= */}
+
+                <div
+                    className="product-info"
+                >
+
+                    <h3
+                        className="product-name"
+                    >
+
+                        {
+                            product.productName
+                        }
+
+                    </h3>
+
+
+                    {product.brand && (
+
+                        <p
+                            className="product-brand"
+                        >
+
+                            {
+                                product.brand
+                            }
+
+                        </p>
+
+                    )}
+
+
+                    <p
+                        className="product-price"
+                    >
+
+                        ₹
+                        {price.toFixed(2)}
+
+                    </p>
+
+
+                    {/* =================================================
+                        ADD TO CART
+                    ================================================= */}
+
                     <button
                         type="button"
                         className="add-to-cart-btn"
-                        onClick={() => onAddToCart(product)}
+                        onClick={
+                            handleAddToCartClick
+                        }
                     >
-                        Add to Cart
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-});
 
-ProductCard.displayName = "ProductCard";
+                        Add to Cart
+
+                    </button>
+
+                </div>
+
+            </div>
+        );
+    }
+);
+
+
+ProductCard.displayName =
+    "ProductCard";
+
 
 export default ProductCard;

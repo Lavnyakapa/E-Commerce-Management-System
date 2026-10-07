@@ -1,122 +1,200 @@
-import React, { useEffect, useState } from "react";
-import { cartService } from "../api/cartService";
+import React, {
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 
-interface CartItem {
-    cartItemId: number;
-    cartId: number;
-    productId: number;
-    variantId: number;
-
-    productName: string;
-    brand: string;
-    sku: string;
-
-    color: string;
-    size: string;
-
-    price: number;
-    quantity: number;
-    stockQuantity: number;
-
-    subtotal: number;
-    totalPrice: number;
-}
-
-interface CartResponse {
-    cartId: number;
-    message: string;
-    items: CartItem[];
-    totalPrice: number;
-}
+import { useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 
 const Cart: React.FC = () => {
 
-    const [items, setItems] = useState<CartItem[]>([]);
-    const [totalPrice, setTotalPrice] = useState<number>(0);
-    const [loading, setLoading] = useState<boolean>(true);
+    const navigate = useNavigate();
 
-    const loadCart = async () => {
+    const {
+        cart,
+        loadCart,
+        updateQuantity,
+        removeFromCart,
+    } = useCart();
+
+    const [loading, setLoading] =
+        useState(true);
+
+    const [processingItem, setProcessingItem] =
+        useState<number | null>(null);
+
+    useEffect(() => {
+
+        const load = async () => {
+
+            setLoading(true);
+
+            try {
+                await loadCart();
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        load();
+
+    }, [loadCart]);
+
+    const totalPrice = useMemo(() => {
+
+        return cart.reduce(
+            (total, item) =>
+                total +
+                Number(item.subtotal || 0),
+            0
+        );
+
+    }, [cart]);
+
+    const handleIncrease = async (
+        cartItemId: number,
+        quantity: number,
+        stockQuantity: number
+    ) => {
+
+        if (quantity >= stockQuantity) {
+
+            alert(
+                "Maximum available stock reached."
+            );
+
+            return;
+        }
 
         try {
 
-            const response: CartResponse =
-                await cartService.getMyCart();
+            setProcessingItem(
+                cartItemId
+            );
 
-            console.log("CART RESPONSE:", response);
+            await updateQuantity(
+                cartItemId,
+                quantity + 1
+            );
 
-            setItems(response.items || []);
+        } catch (error: any) {
 
-            setTotalPrice(response.totalPrice || 0);
-
-        } catch (error) {
-
-            console.error(
-                "Failed to load cart:",
-                error
+            alert(
+                error?.response?.data?.message ||
+                error?.message ||
+                "Failed to update quantity."
             );
 
         } finally {
 
-            setLoading(false);
-
+            setProcessingItem(null);
         }
     };
 
-    useEffect(() => {
+    const handleDecrease = async (
+        cartItemId: number,
+        quantity: number
+    ) => {
 
-        loadCart();
+        if (quantity <= 1) {
+            return;
+        }
 
-    }, []);
+        try {
 
-    /*
-     * Loading
-     */
+            setProcessingItem(
+                cartItemId
+            );
+
+            await updateQuantity(
+                cartItemId,
+                quantity - 1
+            );
+
+        } catch (error: any) {
+
+            alert(
+                error?.response?.data?.message ||
+                error?.message ||
+                "Failed to update quantity."
+            );
+
+        } finally {
+
+            setProcessingItem(null);
+        }
+    };
+
+    const handleRemove = async (
+        cartItemId: number
+    ) => {
+
+        try {
+
+            setProcessingItem(
+                cartItemId
+            );
+
+            await removeFromCart(
+                cartItemId
+            );
+
+        } catch (error: any) {
+
+            alert(
+                error?.response?.data?.message ||
+                error?.message ||
+                "Failed to remove item."
+            );
+
+        } finally {
+
+            setProcessingItem(null);
+        }
+    };
+
     if (loading) {
 
         return (
             <div
                 style={{
                     padding: "40px",
-                    textAlign: "center"
+                    textAlign: "center",
                 }}
             >
-                <h2>Loading cart...</h2>
+                <h2>
+                    Loading cart...
+                </h2>
             </div>
         );
     }
 
-    /*
-     * Cart UI
-     */
     return (
-
         <div
             style={{
                 padding: "40px",
                 maxWidth: "1000px",
-                margin: "0 auto"
+                margin: "0 auto",
             }}
         >
 
             <h1
                 style={{
-                    marginBottom: "30px"
+                    marginBottom: "30px",
                 }}
             >
                 My Cart
             </h1>
 
-
-            {/* Empty Cart */}
-
-            {items.length === 0 ? (
+            {cart.length === 0 ? (
 
                 <div
                     style={{
                         textAlign: "center",
                         padding: "50px",
                         border: "1px solid #ddd",
-                        borderRadius: "10px"
+                        borderRadius: "10px",
                     }}
                 >
 
@@ -128,39 +206,45 @@ const Cart: React.FC = () => {
                         Add some products to your cart.
                     </p>
 
+                    <button
+                        onClick={() =>
+                            navigate("/products")
+                        }
+                        style={{
+                            marginTop: "20px",
+                            padding: "12px 25px",
+                            cursor: "pointer",
+                            borderRadius: "6px",
+                            border: "none",
+                        }}
+                    >
+                        Browse Products
+                    </button>
+
                 </div>
 
             ) : (
 
                 <>
 
-                    {/* Cart Items */}
-
-                    {items.map((item) => (
+                    {cart.map((item) => (
 
                         <div
-                            key={item.cartItemId}
+                            key={
+                                item.cartItemId
+                            }
                             style={{
                                 border: "1px solid #ddd",
                                 padding: "20px",
                                 marginBottom: "20px",
                                 borderRadius: "10px",
-                                backgroundColor: "#fff"
+                                backgroundColor: "#fff",
                             }}
                         >
 
-                            {/* Product Name */}
-
-                            <h2
-                                style={{
-                                    marginBottom: "15px"
-                                }}
-                            >
+                            <h2>
                                 {item.productName}
                             </h2>
-
-
-                            {/* Brand */}
 
                             <p>
                                 <strong>
@@ -169,9 +253,6 @@ const Cart: React.FC = () => {
                                 {item.brand}
                             </p>
 
-
-                            {/* SKU */}
-
                             <p>
                                 <strong>
                                     SKU:
@@ -179,48 +260,29 @@ const Cart: React.FC = () => {
                                 {item.sku}
                             </p>
 
-
-                            {/* Color */}
-
                             <p>
                                 <strong>
                                     Color:
                                 </strong>{" "}
-                                {item.color}
+                                {item.color || "N/A"}
                             </p>
-
-
-                            {/* Size */}
 
                             <p>
                                 <strong>
                                     Size:
                                 </strong>{" "}
-                                {item.size}
+                                {item.size || "N/A"}
                             </p>
-
-
-                            {/* Price */}
 
                             <p>
                                 <strong>
                                     Price:
                                 </strong>{" "}
-                                ₹{item.price}
+                                ₹
+                                {Number(
+                                    item.price || 0
+                                ).toFixed(2)}
                             </p>
-
-
-                            {/* Quantity */}
-
-                            <p>
-                                <strong>
-                                    Quantity:
-                                </strong>{" "}
-                                {item.quantity}
-                            </p>
-
-
-                            {/* Available Stock */}
 
                             <p>
                                 <strong>
@@ -229,27 +291,113 @@ const Cart: React.FC = () => {
                                 {item.stockQuantity}
                             </p>
 
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "10px",
+                                    marginTop: "15px",
+                                }}
+                            >
 
-                            {/* Subtotal */}
+                                <strong>
+                                    Quantity:
+                                </strong>
+
+                                <button
+                                    onClick={() =>
+                                        handleDecrease(
+                                            item.cartItemId,
+                                            item.quantity
+                                        )
+                                    }
+                                    disabled={
+                                        item.quantity <= 1 ||
+                                        processingItem ===
+                                        item.cartItemId
+                                    }
+                                    style={{
+                                        width: "35px",
+                                        height: "35px",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    -
+                                </button>
+
+                                <span
+                                    style={{
+                                        minWidth: "30px",
+                                        textAlign: "center",
+                                    }}
+                                >
+                                    {item.quantity}
+                                </span>
+
+                                <button
+                                    onClick={() =>
+                                        handleIncrease(
+                                            item.cartItemId,
+                                            item.quantity,
+                                            item.stockQuantity
+                                        )
+                                    }
+                                    disabled={
+                                        item.quantity >=
+                                        item.stockQuantity ||
+                                        processingItem ===
+                                        item.cartItemId
+                                    }
+                                    style={{
+                                        width: "35px",
+                                        height: "35px",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    +
+                                </button>
+
+                            </div>
 
                             <p
                                 style={{
                                     fontSize: "18px",
-                                    fontWeight: "bold"
+                                    fontWeight: "bold",
+                                    marginTop: "15px",
                                 }}
                             >
                                 <strong>
                                     Subtotal:
                                 </strong>{" "}
-                                ₹{item.subtotal}
+                                ₹
+                                {Number(
+                                    item.subtotal || 0
+                                ).toFixed(2)}
                             </p>
 
+                            <button
+                                onClick={() =>
+                                    handleRemove(
+                                        item.cartItemId
+                                    )
+                                }
+                                disabled={
+                                    processingItem ===
+                                    item.cartItemId
+                                }
+                                style={{
+                                    marginTop: "10px",
+                                    padding: "10px 18px",
+                                    cursor: "pointer",
+                                    borderRadius: "6px",
+                                    border: "none",
+                                }}
+                            >
+                                Remove
+                            </button>
+
                         </div>
-
                     ))}
-
-
-                    {/* Total */}
 
                     <div
                         style={{
@@ -257,18 +405,34 @@ const Cart: React.FC = () => {
                             padding: "25px",
                             border: "1px solid #ddd",
                             borderRadius: "10px",
-                            textAlign: "right"
+                            textAlign: "right",
                         }}
                     >
 
                         <h2>
-                            Total: ₹{totalPrice}
+                            Total: ₹
+                            {totalPrice.toFixed(2)}
                         </h2>
+
+                        <button
+                            onClick={() =>
+                                navigate("/checkout")
+                            }
+                            style={{
+                                marginTop: "20px",
+                                padding: "12px 25px",
+                                fontSize: "16px",
+                                cursor: "pointer",
+                                borderRadius: "6px",
+                                border: "none",
+                            }}
+                        >
+                            Proceed to Checkout
+                        </button>
 
                     </div>
 
                 </>
-
             )}
 
         </div>

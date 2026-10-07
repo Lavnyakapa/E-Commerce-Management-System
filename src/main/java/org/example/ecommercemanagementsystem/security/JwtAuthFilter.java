@@ -1,5 +1,6 @@
 package org.example.ecommercemanagementsystem.security;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -28,81 +29,88 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // =========================================
-        // OPTIONS / CORS REQUEST
-        // =========================================
+        System.out.println("======================================");
+        System.out.println("JWT FILTER");
+        System.out.println("METHOD : " + request.getMethod());
+        System.out.println("URI    : " + request.getRequestURI());
 
+        String authHeader = request.getHeader("Authorization");
+
+        System.out.println(
+                "AUTHORIZATION HEADER PRESENT: "
+                        + (authHeader != null)
+        );
+
+        // =========================================
+        // OPTIONS REQUEST
+        // =========================================
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+
+            System.out.println("OPTIONS REQUEST");
+
             filterChain.doFilter(request, response);
+
             return;
         }
 
         // =========================================
-        // GET AUTHORIZATION HEADER
+        // NO JWT
         // =========================================
-
-        String authHeader = request.getHeader("Authorization");
-
-        // No JWT → continue normally
         if (authHeader == null ||
                 !authHeader.startsWith("Bearer ")) {
 
+            System.out.println("NO BEARER TOKEN");
+
             filterChain.doFilter(request, response);
+
+            System.out.println(
+                    "RESPONSE STATUS: " + response.getStatus()
+            );
+
+            System.out.println("======================================");
+
             return;
         }
 
         // =========================================
         // EXTRACT TOKEN
         // =========================================
-
-        String token = authHeader.substring(7).trim();
-
-        if (token.isEmpty()) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+        String token = authHeader.substring(7);
 
         try {
 
-            // =========================================
-            // EXTRACT USERNAME AND ROLE
-            // =========================================
+            String username =
+                    jwtUtil.extractUsername(token);
 
-            String username = jwtUtil.extractUsername(token);
-            String role = jwtUtil.extractRole(token);
+            String role =
+                    jwtUtil.extractRole(token);
 
-            System.out.println("JWT USERNAME = " + username);
-            System.out.println("JWT ROLE = " + role);
+            System.out.println("JWT USERNAME : " + username);
+            System.out.println("JWT ROLE     : " + role);
 
             // =========================================
-            // CREATE AUTHENTICATION
+            // SET AUTHENTICATION
             // =========================================
-
             if (username != null &&
-                    role != null &&
                     SecurityContextHolder
                             .getContext()
                             .getAuthentication() == null) {
 
-                String authority;
+                String authorityRole = role;
 
-                if (role.startsWith("ROLE_")) {
-                    authority = role;
-                } else {
-                    authority = "ROLE_" + role;
+                if (authorityRole != null &&
+                        !authorityRole.startsWith("ROLE_")) {
+
+                    authorityRole = "ROLE_" + authorityRole;
                 }
-
-                System.out.println(
-                        "SPRING AUTHORITY = " + authority
-                );
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 username,
                                 null,
-                                Collections.singletonList(
+                                List.of(
                                         new SimpleGrantedAuthority(
-                                                authority
+                                                authorityRole
                                         )
                                 )
                         );
@@ -110,22 +118,43 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 SecurityContextHolder
                         .getContext()
                         .setAuthentication(authentication);
+
+                System.out.println(
+                        "AUTHENTICATION SET SUCCESSFULLY"
+                );
+
+                System.out.println(
+                        "AUTHORITY: "
+                                + authentication.getAuthorities()
+                );
             }
 
-        } catch (Exception e) {
+        } catch (JwtException |
+                 IllegalArgumentException e) {
 
             System.out.println(
-                    "JWT ERROR = " + e.getMessage()
+                    "JWT ERROR: " + e.getMessage()
             );
 
-            // Invalid JWT should not crash the request
             SecurityContextHolder.clearContext();
         }
 
         // =========================================
         // CONTINUE REQUEST
         // =========================================
-
         filterChain.doFilter(request, response);
+
+        System.out.println(
+                "AUTHENTICATION AFTER FILTER: "
+                        + SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+        );
+
+        System.out.println(
+                "RESPONSE STATUS: " + response.getStatus()
+        );
+
+        System.out.println("======================================");
     }
 }

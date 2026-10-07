@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     getSubCategories,
     createSubCategory,
@@ -6,78 +6,85 @@ import {
     deleteSubCategory
 } from "../services/subCategoryService";
 
-
-interface Category {
-    categoryId: number;
-    categoryName: string;
-}
-
-
 interface SubCategory {
-
     subCategoryId: number;
     subCategoryName: string;
     subCategoryDescription: string;
     status: string;
-
-    category?: Category;
-    categoryId?: number;
-
+    categoryId: number;
 }
 
+const SubCategoryList: React.FC = () => {
 
-interface SubCategoryForm {
+    const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
 
-    subCategoryName: string;
-    subCategoryDescription: string;
-    status: string;
-    categoryId: string;
+    const [loading, setLoading] = useState<boolean>(true);
 
-}
+    const [error, setError] = useState<string>("");
 
+    const [showForm, setShowForm] = useState<boolean>(false);
 
-function SubCategoryList() {
+    const [editId, setEditId] = useState<number | null>(null);
 
-    const [subCategories, setSubCategories] =
-        useState<SubCategory[]>([]);
-
-    const [showForm, setShowForm] =
-        useState(false);
-
-    const [editId, setEditId] =
-        useState<number | null>(null);
-
-    const [form, setForm] =
-        useState<SubCategoryForm>({
-            subCategoryName: "",
-            subCategoryDescription: "",
-            status: "ACTIVE",
-            categoryId: ""
-        });
+    const [form, setForm] = useState({
+        subCategoryName: "",
+        subCategoryDescription: "",
+        status: "ACTIVE",
+        categoryId: 1
+    });
 
 
-    // Load subcategories
-    const loadSubCategories = () => {
+    /* =========================================================
+       LOAD SUBCATEGORIES
+    ========================================================= */
 
-        getSubCategories()
-            .then((response) => {
+    const loadSubCategories = async () => {
 
-                console.log(response.data);
+        try {
 
-                setSubCategories(response.data);
+            setLoading(true);
+            setError("");
 
-            })
-            .catch((error) => {
+            const response = await getSubCategories();
 
-                console.error(
-                    "Error loading subcategories:",
-                    error
-                );
+            const data = response.data;
 
-            });
+            if (Array.isArray(data)) {
 
+                setSubCategories(data);
+
+            } else if (Array.isArray(data?.data)) {
+
+                setSubCategories(data.data);
+
+            } else {
+
+                setSubCategories([]);
+
+            }
+
+        } catch (err) {
+
+            console.error(
+                "Error loading subcategories:",
+                err
+            );
+
+            setError(
+                "Failed to load subcategories."
+            );
+
+        } finally {
+
+            setLoading(false);
+
+        }
     };
 
+
+    /* =========================================================
+       INITIAL LOAD
+    ========================================================= */
 
     useEffect(() => {
 
@@ -86,187 +93,194 @@ function SubCategoryList() {
     }, []);
 
 
-    // Handle input
+    /* =========================================================
+       INPUT CHANGE
+    ========================================================= */
+
     const handleChange = (
-        event: React.ChangeEvent<
-            HTMLInputElement |
-            HTMLTextAreaElement |
-            HTMLSelectElement
+        e: React.ChangeEvent<
+            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
         >
     ) => {
 
-        const { name, value } = event.target;
+        const { name, value } = e.target;
 
-        setForm((previous) => ({
-            ...previous,
-            [name]: value
+        setForm(prev => ({
+            ...prev,
+            [name]:
+                name === "categoryId"
+                    ? Number(value)
+                    : value
         }));
 
     };
 
 
-    // Add
-    const handleAdd = () => {
+    /* =========================================================
+       RESET FORM
+    ========================================================= */
 
-        setEditId(null);
+    const resetForm = () => {
 
         setForm({
             subCategoryName: "",
             subCategoryDescription: "",
             status: "ACTIVE",
-            categoryId: ""
+            categoryId: 1
         });
 
-        setShowForm(true);
+        setEditId(null);
+
+        setShowForm(false);
 
     };
 
 
-    // Edit
-    const handleEdit = (sub: SubCategory) => {
+    /* =========================================================
+       ADD
+    ========================================================= */
 
-        setEditId(sub.subCategoryId);
-
-        setForm({
-            subCategoryName: sub.subCategoryName,
-            subCategoryDescription:
-            sub.subCategoryDescription,
-            status: sub.status,
-            categoryId: String(
-                sub.category?.categoryId ??
-                sub.categoryId ??
-                ""
-            )
-        });
-
-        setShowForm(true);
-
-    };
-
-
-    // Create / Update
-    const handleSubmit = async (
-        event: React.FormEvent
+    const handleAdd = async (
+        e: React.FormEvent
     ) => {
 
-        event.preventDefault();
-
-
-        if (!form.subCategoryName.trim()) {
-
-            alert("Please enter subcategory name");
-
-            return;
-
-        }
-
-
-        if (!form.categoryId) {
-
-            alert("Please enter category ID");
-
-            return;
-
-        }
-
-
-        const request = {
-
-            subCategoryName:
-            form.subCategoryName,
-
-            subCategoryDescription:
-            form.subCategoryDescription,
-
-            status:
-            form.status,
-
-            categoryId:
-                Number(form.categoryId)
-
-        };
-
+        e.preventDefault();
 
         try {
 
-            if (editId !== null) {
+            await createSubCategory(form);
 
-                await updateSubCategory(
-                    editId,
-                    request
-                );
+            alert("Subcategory created successfully.");
 
-                alert(
-                    "Subcategory updated successfully"
-                );
+            resetForm();
 
-            } else {
+            await loadSubCategories();
 
-                await createSubCategory(
-                    request
-                );
-
-                alert(
-                    "Subcategory created successfully"
-                );
-
-            }
-
-
-            setShowForm(false);
-
-            setEditId(null);
-
-            loadSubCategories();
-
-        } catch (error) {
+        } catch (err) {
 
             console.error(
-                "Error saving subcategory:",
-                error
+                "Error creating subcategory:",
+                err
             );
 
-            alert("Failed to save subcategory");
+            alert(
+                "Failed to create subcategory."
+            );
 
         }
 
     };
 
 
-    // Delete
-    const handleDelete = async (id: number) => {
+    /* =========================================================
+       EDIT
+    ========================================================= */
+
+    const handleEdit = (
+        subCategory: SubCategory
+    ) => {
+
+        setEditId(subCategory.subCategoryId);
+
+        setForm({
+            subCategoryName:
+                subCategory.subCategoryName || "",
+
+            subCategoryDescription:
+                subCategory.subCategoryDescription || "",
+
+            status:
+                subCategory.status || "ACTIVE",
+
+            categoryId:
+                Number(subCategory.categoryId) || 1
+        });
+
+        setShowForm(true);
+
+    };
+
+
+    /* =========================================================
+       UPDATE
+    ========================================================= */
+
+    const handleUpdate = async (
+        e: React.FormEvent
+    ) => {
+
+        e.preventDefault();
+
+        if (editId === null) {
+            return;
+        }
+
+        try {
+
+            await updateSubCategory(
+                editId,
+                form
+            );
+
+            alert(
+                "Subcategory updated successfully."
+            );
+
+            resetForm();
+
+            await loadSubCategories();
+
+        } catch (err) {
+
+            console.error(
+                "Error updating subcategory:",
+                err
+            );
+
+            alert(
+                "Failed to update subcategory."
+            );
+
+        }
+
+    };
+
+
+    /* =========================================================
+       DELETE
+    ========================================================= */
+
+    const handleDelete = async (
+        id: number
+    ) => {
 
         const confirmed = window.confirm(
             "Are you sure you want to delete this subcategory?"
         );
 
-
         if (!confirmed) {
-
             return;
-
         }
-
 
         try {
 
             await deleteSubCategory(id);
 
             alert(
-                "Subcategory deleted successfully"
+                "Subcategory deleted successfully."
             );
 
-            loadSubCategories();
+            await loadSubCategories();
 
-        } catch (error) {
+        } catch (err) {
 
             console.error(
                 "Error deleting subcategory:",
-                error
+                err
             );
 
             alert(
-                "Unable to delete subcategory."
+                "Failed to delete subcategory."
             );
 
         }
@@ -274,11 +288,41 @@ function SubCategoryList() {
     };
 
 
+    /* =========================================================
+       LOADING
+    ========================================================= */
+
+    if (loading) {
+
+        return (
+            <div
+                style={{
+                    padding: "20px",
+                    textAlign: "center"
+                }}
+            >
+                Loading subcategories...
+            </div>
+        );
+
+    }
+
+
+    /* =========================================================
+       UI
+    ========================================================= */
+
     return (
 
-        <div style={{ padding: "20px" }}>
+        <div
+            style={{
+                padding: "20px"
+            }}
+        >
 
-            {/* Header */}
+            {/* =================================================
+                HEADER
+            ================================================= */}
 
             <div
                 style={{
@@ -290,320 +334,456 @@ function SubCategoryList() {
             >
 
                 <h2>
-                    Sub Categories List
+                    Subcategory Management
                 </h2>
 
-
                 <button
-                    onClick={handleAdd}
+                    type="button"
+                    onClick={() => {
+
+                        if (showForm) {
+
+                            resetForm();
+
+                        } else {
+
+                            setShowForm(true);
+
+                        }
+
+                    }}
                     style={{
-                        padding: "10px 16px",
+                        padding: "10px 18px",
                         cursor: "pointer"
                     }}
                 >
-                    + Add Sub Category
+                    {showForm
+                        ? "Cancel"
+                        : "Add Subcategory"}
                 </button>
 
             </div>
 
 
-            {/* Add / Edit Form */}
+            {/* =================================================
+                ERROR
+            ================================================= */}
 
-            {showForm && (
+            {error && (
 
                 <div
                     style={{
-                        border: "1px solid #ccc",
-                        padding: "20px",
-                        marginBottom: "25px",
-                        borderRadius: "8px"
+                        color: "red",
+                        marginBottom: "15px"
                     }}
                 >
-
-                    <h3>
-                        {editId !== null
-                            ? "Edit Sub Category"
-                            : "Add Sub Category"}
-                    </h3>
-
-
-                    <form onSubmit={handleSubmit}>
-
-                        {/* Name */}
-
-                        <div style={{ marginBottom: "15px" }}>
-
-                            <label>
-                                Sub Category Name
-                            </label>
-
-                            <br />
-
-                            <input
-                                type="text"
-                                name="subCategoryName"
-                                value={
-                                    form.subCategoryName
-                                }
-                                onChange={handleChange}
-                                placeholder="Enter subcategory name"
-                            />
-
-                        </div>
-
-
-                        {/* Category ID */}
-
-                        <div style={{ marginBottom: "15px" }}>
-
-                            <label>
-                                Category ID
-                            </label>
-
-                            <br />
-
-                            <input
-                                type="number"
-                                name="categoryId"
-                                value={
-                                    form.categoryId
-                                }
-                                onChange={handleChange}
-                                placeholder="Enter category ID"
-                            />
-
-                        </div>
-
-
-                        {/* Description */}
-
-                        <div style={{ marginBottom: "15px" }}>
-
-                            <label>
-                                Description
-                            </label>
-
-                            <br />
-
-                            <textarea
-                                name="subCategoryDescription"
-                                value={
-                                    form.subCategoryDescription
-                                }
-                                onChange={handleChange}
-                                placeholder="Enter description"
-                            />
-
-                        </div>
-
-
-                        {/* Status */}
-
-                        <div style={{ marginBottom: "15px" }}>
-
-                            <label>
-                                Status
-                            </label>
-
-                            <br />
-
-                            <select
-                                name="status"
-                                value={form.status}
-                                onChange={handleChange}
-                            >
-
-                                <option value="ACTIVE">
-                                    ACTIVE
-                                </option>
-
-                                <option value="INACTIVE">
-                                    INACTIVE
-                                </option>
-
-                            </select>
-
-                        </div>
-
-
-                        {/* Buttons */}
-
-                        <button
-                            type="submit"
-                            style={{
-                                marginRight: "10px",
-                                padding: "8px 15px",
-                                cursor: "pointer"
-                            }}
-                        >
-
-                            {editId !== null
-                                ? "Update"
-                                : "Save"}
-
-                        </button>
-
-
-                        <button
-                            type="button"
-                            onClick={() => {
-
-                                setShowForm(false);
-
-                                setEditId(null);
-
-                            }}
-                            style={{
-                                padding: "8px 15px",
-                                cursor: "pointer"
-                            }}
-                        >
-
-                            Cancel
-
-                        </button>
-
-                    </form>
-
+                    {error}
                 </div>
 
             )}
 
 
-            {/* Table */}
+            {/* =================================================
+                FORM
+            ================================================= */}
 
-            <table
-                border={1}
-                cellPadding={10}
-                cellSpacing={0}
-                style={{
-                    border: "3px solid #ccc",
-                    width: "100%",
-                    borderCollapse: "collapse"
-                }}
-            >
+            {showForm && (
 
-                <thead>
+                <form
+                    onSubmit={
+                        editId === null
+                            ? handleAdd
+                            : handleUpdate
+                    }
+                    style={{
+                        border: "1px solid #ccc",
+                        padding: "20px",
+                        marginBottom: "25px"
+                    }}
+                >
 
-                <tr style={{borderBottom: "2px solid #ccc" , backgroundColor: "#f2f2f2" , textAlign: "center"}}>
-
-
-                    <th>ID</th>
-
-                    <th>Name</th>
-
-                    <th>Category ID</th>
-
-                    <th>Description</th>
-
-                    <th>Status</th>
-
-                    <th>Actions</th>
-
-                </tr>
-
-                </thead>
+                    <h3>
+                        {editId === null
+                            ? "Add Subcategory"
+                            : "Edit Subcategory"}
+                    </h3>
 
 
-                <tbody>
+                    {/* NAME */}
 
-                {subCategories.map((sub) => (
+                    <div
+                        style={{
+                            marginBottom: "15px"
+                        }}
+                    >
 
-                    <tr key={sub.subCategoryId}
-                    style={{borderBottom: "3Fpx solid #ccc" , textAlign: "center" , backgroundColor: "#f9f9f9"}}>
+                        <label>
+                            Subcategory Name
+                        </label>
 
-                        <td>
-                            {sub.subCategoryId}
-                        </td>
-
-
-                        <td>
-                            {sub.subCategoryName}
-                        </td>
-
-
-                        <td>
-
-                            {
-                                sub.category
-                                    ? sub.category.categoryId
-                                    : sub.categoryId
+                        <input
+                            type="text"
+                            name="subCategoryName"
+                            value={
+                                form.subCategoryName
                             }
-
-                        </td>
-
-
-                        <td>
-                            {sub.subCategoryDescription}
-                        </td>
-
-
-                        <td>
-                            {sub.status}
-                        </td>
-
-
-                        <td>
-
-                            <button
-                                onClick={() =>
-                                    handleEdit(sub)
-                                }
-                                style={{
-                                    marginRight: "8px",
-                                    cursor: "pointer"
-                                }}
-                            >
-                                ✏️ Edit
-                            </button>
-
-
-                            <button
-                                onClick={() =>
-                                    handleDelete(
-                                        sub.subCategoryId
-                                    )
-                                }
-                                style={{
-                                    cursor: "pointer"
-                                }}
-                            >
-                                🗑️ Delete
-                            </button>
-
-                        </td>
-
-                    </tr>
-
-                ))}
-
-
-                {subCategories.length === 0 && (
-
-                    <tr>
-
-                        <td
-                            colSpan={6}
+                            onChange={handleChange}
+                            required
                             style={{
-                                textAlign: "center"
+                                display: "block",
+                                width: "100%",
+                                padding: "8px",
+                                marginTop: "5px"
+                            }}
+                        />
+
+                    </div>
+
+
+                    {/* DESCRIPTION */}
+
+                    <div
+                        style={{
+                            marginBottom: "15px"
+                        }}
+                    >
+
+                        <label>
+                            Description
+                        </label>
+
+                        <textarea
+                            name="subCategoryDescription"
+                            value={
+                                form.subCategoryDescription
+                            }
+                            onChange={handleChange}
+                            style={{
+                                display: "block",
+                                width: "100%",
+                                padding: "8px",
+                                marginTop: "5px"
+                            }}
+                        />
+
+                    </div>
+
+
+                    {/* STATUS */}
+
+                    <div
+                        style={{
+                            marginBottom: "15px"
+                        }}
+                    >
+
+                        <label>
+                            Status
+                        </label>
+
+                        <select
+                            name="status"
+                            value={form.status}
+                            onChange={handleChange}
+                            style={{
+                                display: "block",
+                                padding: "8px",
+                                marginTop: "5px"
                             }}
                         >
-                            No subcategories found
-                        </td>
 
-                    </tr>
+                            <option value="ACTIVE">
+                                ACTIVE
+                            </option>
 
-                )}
+                            <option value="INACTIVE">
+                                INACTIVE
+                            </option>
 
-                </tbody>
+                        </select>
 
-            </table>
+                    </div>
+
+
+                    {/* CATEGORY ID */}
+
+                    <div
+                        style={{
+                            marginBottom: "15px"
+                        }}
+                    >
+
+                        <label>
+                            Category ID
+                        </label>
+
+                        <input
+                            type="number"
+                            name="categoryId"
+                            value={form.categoryId}
+                            onChange={handleChange}
+                            required
+                            min="1"
+                            style={{
+                                display: "block",
+                                width: "100%",
+                                padding: "8px",
+                                marginTop: "5px"
+                            }}
+                        />
+
+                    </div>
+
+
+                    {/* BUTTONS */}
+
+                    <div>
+
+                        <button
+                            type="submit"
+                            style={{
+                                padding: "9px 16px",
+                                marginRight: "10px",
+                                cursor: "pointer"
+                            }}
+                        >
+                            {editId === null
+                                ? "Create"
+                                : "Update"}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={resetForm}
+                            style={{
+                                padding: "9px 16px",
+                                cursor: "pointer"
+                            }}
+                        >
+                            Cancel
+                        </button>
+
+                    </div>
+
+                </form>
+
+            )}
+
+
+            {/* =================================================
+                TABLE
+            ================================================= */}
+
+            {subCategories.length === 0 ? (
+
+                <div
+                    style={{
+                        padding: "20px",
+                        textAlign: "center"
+                    }}
+                >
+                    No subcategories found.
+                </div>
+
+            ) : (
+
+                <div
+                    style={{
+                        overflowX: "auto"
+                    }}
+                >
+
+                    <table
+                        style={{
+                            width: "100%",
+                            borderCollapse: "collapse"
+                        }}
+                    >
+
+                        <thead>
+
+                        <tr>
+
+                            <th
+                                style={{
+                                    border: "1px solid #ccc",
+                                    padding: "10px"
+                                }}
+                            >
+                                ID
+                            </th>
+
+                            <th
+                                style={{
+                                    border: "1px solid #ccc",
+                                    padding: "10px"
+                                }}
+                            >
+                                Name
+                            </th>
+
+                            <th
+                                style={{
+                                    border: "1px solid #ccc",
+                                    padding: "10px"
+                                }}
+                            >
+                                Description
+                            </th>
+
+                            <th
+                                style={{
+                                    border: "1px solid #ccc",
+                                    padding: "10px"
+                                }}
+                            >
+                                Status
+                            </th>
+
+                            <th
+                                style={{
+                                    border: "1px solid #ccc",
+                                    padding: "10px"
+                                }}
+                            >
+                                Category ID
+                            </th>
+
+                            <th
+                                style={{
+                                    border: "1px solid #ccc",
+                                    padding: "10px"
+                                }}
+                            >
+                                Actions
+                            </th>
+
+                        </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                        {subCategories.map(
+                            (subCategory) => (
+
+                                <tr
+                                    key={
+                                        subCategory.subCategoryId
+                                    }
+                                >
+
+                                    <td
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            padding: "10px"
+                                        }}
+                                    >
+                                        {
+                                            subCategory.subCategoryId
+                                        }
+                                    </td>
+
+                                    <td
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            padding: "10px"
+                                        }}
+                                    >
+                                        {
+                                            subCategory.subCategoryName
+                                        }
+                                    </td>
+
+                                    <td
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            padding: "10px"
+                                        }}
+                                    >
+                                        {
+                                            subCategory.subCategoryDescription
+                                        }
+                                    </td>
+
+                                    <td
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            padding: "10px"
+                                        }}
+                                    >
+                                        {
+                                            subCategory.status
+                                        }
+                                    </td>
+
+                                    <td
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            padding: "10px"
+                                        }}
+                                    >
+                                        {
+                                            subCategory.categoryId
+                                        }
+                                    </td>
+
+                                    <td
+                                        style={{
+                                            border: "1px solid #ccc",
+                                            padding: "10px"
+                                        }}
+                                    >
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleEdit(
+                                                    subCategory
+                                                )
+                                            }
+                                            style={{
+                                                marginRight: "8px",
+                                                padding: "6px 12px",
+                                                cursor: "pointer"
+                                            }}
+                                        >
+                                            Edit
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleDelete(
+                                                    subCategory.subCategoryId
+                                                )
+                                            }
+                                            style={{
+                                                padding: "6px 12px",
+                                                cursor: "pointer"
+                                            }}
+                                        >
+                                            Delete
+                                        </button>
+
+                                    </td>
+
+                                </tr>
+
+                            )
+                        )}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            )}
 
         </div>
 
     );
-
-}
-
+};
 
 export default SubCategoryList;

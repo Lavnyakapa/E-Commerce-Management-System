@@ -1128,8 +1128,8 @@ function Users() {
                                                 style={{
                                                     display:
                                                         "flex",
-                                                    gap:
-                                                        "6px",
+                                                    marginRight: "22px",
+                                                    marginLeft: "22px",
                                                     justifyContent:
                                                         "center",
                                                     flexWrap:

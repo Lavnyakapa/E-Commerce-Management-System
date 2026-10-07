@@ -1,6 +1,5 @@
 package org.example.ecommercemanagementsystem.serviceimpl;
 
-
 import lombok.RequiredArgsConstructor;
 
 import org.example.ecommercemanagementsystem.dto.*;
@@ -14,27 +13,22 @@ import org.example.ecommercemanagementsystem.service.OrderService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
-import java.util.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
-
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class OrderServiceImpl implements OrderService {
 
-
     private final OrderRepository orderRepository;
-
     private final UserRepository userRepository;
-
     private final AddressRepository addressRepository;
-
     private final CartRepository cartRepository;
-
     private final OrderItemRepository orderItemRepository;
-
+    private final OrderHistoryRepository orderHistoryRepository;
 
 
     // ================= CREATE ORDER =================
@@ -42,44 +36,59 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse createOrder(OrderRequest request) {
 
-
+        // 1. Find user
         UserEntity user =
                 userRepository.findById(request.getUserId())
                         .orElseThrow(() ->
                                 new UserNotFoundException(
                                         "User not found with id : "
-                                                + request.getUserId()));
+                                                + request.getUserId()
+                                )
+                        );
 
 
-
+        // 2. Find address
         AddressEntity address =
                 addressRepository.findById(request.getAddressId())
                         .orElseThrow(() ->
                                 new AddressNotFoundException(
                                         "Address not found with id : "
-                                                + request.getAddressId()));
+                                                + request.getAddressId()
+                                )
+                        );
 
 
+        // 3. Make sure address belongs to this user
+        if (!address.getUser().getUserId().equals(user.getUserId())) {
 
+            throw new RuntimeException(
+                    "Address does not belong to the user"
+            );
+        }
+
+
+        // 4. Find user's cart
         CartEntity cart =
                 cartRepository.findByUserUserId(user.getUserId())
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                        "Cart not found"));
+                                        "Cart not found"
+                                )
+                        );
 
 
-
-        if(cart.getCartItems().isEmpty()){
+        // 5. Check cart is not empty
+        if (cart.getCartItems() == null ||
+                cart.getCartItems().isEmpty()) {
 
             throw new RuntimeException(
-                    "Cart is empty");
-
+                    "Cart is empty"
+            );
         }
 
 
-
+        // 6. Create order
         OrderEntity order = new OrderEntity();
-
 
         order.setUser(user);
 
@@ -90,34 +99,51 @@ public class OrderServiceImpl implements OrderService {
         );
 
 
-
+        // 7. Calculate total
         double totalAmount = 0;
-
-
 
         List<OrderItemEntity> orderItems =
                 new ArrayList<>();
 
 
-
-        for(CartItemEntity cartItem :
-                cart.getCartItems()){
-
+        // 8. Convert cart items to order items
+        for (CartItemEntity cartItem : cart.getCartItems()) {
 
             ProductVariantEntity variant =
                     cartItem.getProductVariant();
 
 
+            if (variant == null) {
+
+                throw new RuntimeException(
+                        "Product variant not found for cart item"
+                );
+            }
+
+
+            if (variant.getPrice() == null) {
+
+                throw new RuntimeException(
+                        "Product price not found"
+                );
+            }
+
+
+            if (cartItem.getQuantity() == null ||
+                    cartItem.getQuantity() <= 0) {
+
+                throw new RuntimeException(
+                        "Invalid cart item quantity"
+                );
+            }
+
 
             double itemTotal =
                     variant.getPrice()
-                            *
-                            cartItem.getQuantity();
-
+                            * cartItem.getQuantity();
 
 
             totalAmount += itemTotal;
-
 
 
             OrderItemEntity item =
@@ -130,257 +156,340 @@ public class OrderServiceImpl implements OrderService {
                             .build();
 
 
-
             orderItems.add(item);
-
         }
 
 
-
+        // 9. Set order items
         order.setOrderItems(orderItems);
 
+
+        // 10. Set total amount
         order.setTotalAmount(totalAmount);
 
-        order.setOrderStatus(OrderStatus.PENDING);
 
-        order.setPaymentStatus(PaymentStatus.PENDING);
+        // 11. Set order status
+        order.setOrderStatus(
+                OrderStatus.PENDING
+        );
 
 
+        // 12. Set payment status
+        order.setPaymentStatus(
+                PaymentStatus.PENDING
+        );
 
+
+        // 13. Save order
         order = orderRepository.save(order);
 
 
+        // 14. Create initial order history
+        OrderHistoryEntity history =
+                OrderHistoryEntity.builder()
+                        .order(order)
+                        .status(OrderStatus.PENDING)
+                        .changedAt(LocalDateTime.now())
+                        .build();
 
-        // Clear cart after order creation
+        orderHistoryRepository.save(history);
 
+
+        // 15. Clear cart after successful order creation
         cart.getCartItems().clear();
 
         cartRepository.save(cart);
 
 
-
+        // 16. Return order response
         return mapToResponse(order);
-
     }
 
 
-
-    // ================= GET BY ID =================
-
+    // ================= GET ORDER BY ID =================
 
     @Override
-    public OrderResponse getOrderById(Long orderId){
-
+    public OrderResponse getOrderById(Long orderId) {
 
         OrderEntity order =
                 orderRepository.findById(orderId)
                         .orElseThrow(() ->
                                 new OrderNotFoundException(
                                         "Order not found with id : "
-                                                + orderId));
-
+                                                + orderId
+                                )
+                        );
 
         return mapToResponse(order);
-
     }
 
 
-
-    // ================= GET ALL =================
-
+    // ================= GET ALL ORDERS =================
 
     @Override
-    public List<OrderResponse> getAllOrders(){
-
+    public List<OrderResponse> getAllOrders() {
 
         return orderRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
-
     }
-
 
 
     // ================= GET USER ORDERS =================
 
-
     @Override
-    public List<OrderResponse> getOrdersByUser(Long userId){
+    public List<OrderResponse> getOrdersByUser(Long userId) {
 
-
-        return orderRepository.findByUserUserId(userId)
+        return orderRepository
+                .findByUserUserId(userId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
-
     }
 
 
-
-    // ================= UPDATE STATUS =================
-
+    // ================= UPDATE ORDER STATUS =================
 
     @Override
     public OrderResponse updateOrderStatus(
             Long orderId,
-            OrderStatus status){
-
+            OrderStatus status) {
 
         OrderEntity order =
                 orderRepository.findById(orderId)
                         .orElseThrow(() ->
                                 new OrderNotFoundException(
-                                        "Order not found"));
+                                        "Order not found"
+                                )
+                        );
 
 
+        // Update current order status
         order.setOrderStatus(status);
 
 
-        return mapToResponse(
-                orderRepository.save(order)
-        );
+        // Save order
+        order = orderRepository.save(order);
 
+
+        // Create order history record
+        OrderHistoryEntity history =
+                OrderHistoryEntity.builder()
+                        .order(order)
+                        .status(status)
+                        .changedAt(LocalDateTime.now())
+                        .build();
+
+        orderHistoryRepository.save(history);
+
+
+        return mapToResponse(order);
     }
 
 
-
-    // ================= DELETE =================
-
+    // ================= DELETE ORDER =================
 
     @Override
-    public OrderDeleteResponse deleteOrder(Long orderId){
-
+    public OrderDeleteResponse deleteOrder(Long orderId) {
 
         OrderEntity order =
                 orderRepository.findById(orderId)
                         .orElseThrow(() ->
                                 new OrderNotFoundException(
-                                        "Order not found"));
+                                        "Order not found"
+                                )
+                        );
 
 
         orderRepository.delete(order);
-
 
 
         return OrderDeleteResponse.builder()
                 .orderId(orderId)
                 .message("Order deleted successfully")
                 .build();
-
     }
-
 
 
     // ================= MAPPER =================
 
-
     private OrderResponse mapToResponse(
-            OrderEntity order){
+            OrderEntity order) {
 
+
+        // ================= ORDER ITEMS =================
 
         List<OrderItemResponse> items =
                 order.getOrderItems()
                         .stream()
                         .map(item ->
-
                                 OrderItemResponse.builder()
 
                                         .orderItemId(
-                                                item.getOrderItemId())
+                                                item.getOrderItemId()
+                                        )
 
                                         .variantId(
                                                 item.getProductVariant()
-                                                        .getVariantId())
+                                                        .getVariantId()
+                                        )
 
                                         .productName(
                                                 item.getProductVariant()
                                                         .getProduct()
-                                                        .getProductName())
+                                                        .getProductName()
+                                        )
 
                                         .sku(
                                                 item.getProductVariant()
-                                                        .getSku())
+                                                        .getSku()
+                                        )
 
                                         .size(
                                                 item.getProductVariant()
-                                                        .getSize())
+                                                        .getSize()
+                                        )
 
                                         .color(
                                                 item.getProductVariant()
-                                                        .getColor())
+                                                        .getColor()
+                                        )
 
                                         .quantity(
-                                                item.getQuantity())
+                                                item.getQuantity()
+                                        )
 
                                         .price(
-                                                item.getPrice())
+                                                item.getPrice()
+                                        )
 
                                         .totalPrice(
-                                                item.getTotalPrice())
+                                                item.getTotalPrice()
+                                        )
 
                                         .build()
 
-                        ).collect(Collectors.toList());
+                        )
+                        .collect(Collectors.toList());
 
 
+        // ================= ORDER HISTORY =================
+
+        List<OrderHistoryResponse> orderHistory =
+                orderHistoryRepository
+                        .findByOrderOrderIdOrderByChangedAtAsc(
+                                order.getOrderId()
+                        )
+                        .stream()
+                        .map(history ->
+                                OrderHistoryResponse.builder()
+                                        .historyId(
+                                                history.getHistoryId()
+                                        )
+                                        .status(
+                                                history.getStatus().name()
+                                        )
+                                        .changedAt(
+                                                history.getChangedAt()
+                                        )
+                                        .build()
+                        )
+                        .collect(Collectors.toList());
+
+
+        // ================= ORDER RESPONSE =================
 
         return OrderResponse.builder()
 
-                .orderId(order.getOrderId())
+                .orderId(
+                        order.getOrderId()
+                )
 
-                .orderNumber(order.getOrderNumber())
+                .orderNumber(
+                        order.getOrderNumber()
+                )
 
-                .userId(order.getUser().getUserId())
+                .userId(
+                        order.getUser().getUserId()
+                )
 
                 .customerName(
                         order.getUser().getFirstName()
-                                +" "
-                                +order.getUser().getLastName())
+                                + " "
+                                + order.getUser().getLastName()
+                )
 
-                .email(order.getUser().getEmail())
+                .email(
+                        order.getUser().getEmail()
+                )
+
+
+                // ================= ADDRESS =================
 
                 .addressId(
-                        order.getAddress().getAddressId())
+                        order.getAddress().getAddressId()
+                )
 
                 .fullName(
-                        order.getAddress().getFullName())
+                        order.getAddress().getFullName()
+                )
 
                 .phoneNumber(
-                        order.getAddress().getPhoneNumber())
+                        order.getAddress().getPhoneNumber()
+                )
 
                 .addressLine1(
-                        order.getAddress().getAddressLine1())
+                        order.getAddress().getAddressLine1()
+                )
+
+                .addressLine2(
+                        order.getAddress().getAddressLine2()
+                )
 
                 .city(
-                        order.getAddress().getCity())
+                        order.getAddress().getCity()
+                )
 
                 .state(
-                        order.getAddress().getState())
+                        order.getAddress().getState()
+                )
 
                 .country(
-                        order.getAddress().getCountry())
+                        order.getAddress().getCountry()
+                )
 
                 .postalCode(
-                        order.getAddress().getPostalCode())
+                        order.getAddress().getPostalCode()
+                )
+
+
+                // ================= ORDER =================
 
                 .totalAmount(
-                        order.getTotalAmount())
+                        order.getTotalAmount()
+                )
 
                 .orderStatus(
-                        order.getOrderStatus().name())
+                        order.getOrderStatus().name()
+                )
 
                 .paymentStatus(
-                        order.getPaymentStatus().name())
+                        order.getPaymentStatus().name()
+                )
 
                 .items(items)
 
-                .createdAt(order.getCreatedAt())
+                .orderHistory(orderHistory)
 
-                .updatedAt(order.getUpdatedAt())
+                .createdAt(
+                        order.getCreatedAt()
+                )
+
+                .updatedAt(
+                        order.getUpdatedAt()
+                )
 
                 .build();
-
     }
-
 }

@@ -1,4 +1,5 @@
-package org.example.ecommercemanagementsystem.service.impl;
+
+package org.example.ecommercemanagementsystem.serviceimpl;
 
 import lombok.RequiredArgsConstructor;
 import org.example.ecommercemanagementsystem.dto.CartItemResponse;
@@ -29,11 +30,20 @@ public class CartServiceImpl implements CartService {
     private final UserRepository userRepository;
     private final ProductVariantRepository productVariantRepository;
 
+    // =========================================================
+    // ADD TO CART
+    // =========================================================
     @Override
     public CartResponse addToCart(
             Long variantId,
             Integer quantity
     ) {
+
+        System.out.println("======================================");
+        System.out.println("CART SERVICE ADD TO CART CALLED");
+        System.out.println("Variant ID : " + variantId);
+        System.out.println("Quantity   : " + quantity);
+        System.out.println("======================================");
 
         if (quantity == null || quantity <= 0) {
             throw new RuntimeException(
@@ -41,32 +51,36 @@ public class CartServiceImpl implements CartService {
             );
         }
 
-        // Get logged-in username/email from JWT
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
+        String email = getLoggedInEmail();
 
-        // Find user
-        UserEntity user = userRepository
-                .findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "User not found"
-                        )
-                );
+        System.out.println("Logged-in email: " + email);
 
-        // Find variant
+        UserEntity user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found with email: " + email
+                                )
+                        );
+
+        System.out.println("User found. User ID: " + user.getUserId());
+
         ProductVariantEntity variant =
                 productVariantRepository
                         .findById(variantId)
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                        "Product variant not found"
+                                        "Product variant not found with id: "
+                                                + variantId
                                 )
                         );
 
-        // Check stock
+        System.out.println(
+                "Variant found. Variant ID: "
+                        + variant.getVariantId()
+        );
+
         if (variant.getStockQuantity() == null ||
                 variant.getStockQuantity() <= 0) {
 
@@ -75,25 +89,50 @@ public class CartServiceImpl implements CartService {
             );
         }
 
-        // Get existing cart or create new cart
+        System.out.println(
+                "Available stock: "
+                        + variant.getStockQuantity()
+        );
+
+        if (quantity > variant.getStockQuantity()) {
+            throw new RuntimeException(
+                    "Requested quantity exceeds available stock"
+            );
+        }
+
         CartEntity cart =
                 cartRepository
                         .findByUserUserId(user.getUserId())
                         .orElseGet(() -> {
 
+                            System.out.println(
+                                    "Cart not found. Creating new cart."
+                            );
+
                             CartEntity newCart =
                                     new CartEntity();
 
                             newCart.setUser(user);
-
                             newCart.setCartItems(
                                     new ArrayList<>()
                             );
 
-                            return cartRepository.save(newCart);
+                            CartEntity savedCart =
+                                    cartRepository.save(newCart);
+
+                            System.out.println(
+                                    "New cart created. Cart ID: "
+                                            + savedCart.getCartId()
+                            );
+
+                            return savedCart;
                         });
 
-        // Check if variant already exists in cart
+        System.out.println(
+                "Using Cart ID: "
+                        + cart.getCartId()
+        );
+
         CartItemEntity cartItem =
                 cartItemRepository
                         .findByCartAndProductVariant(
@@ -104,10 +143,24 @@ public class CartServiceImpl implements CartService {
 
         if (cartItem != null) {
 
+            System.out.println(
+                    "Existing cart item found. Cart Item ID: "
+                            + cartItem.getCartItemId()
+            );
+
             int newQuantity =
                     cartItem.getQuantity() + quantity;
 
-            // Prevent adding more than stock
+            System.out.println(
+                    "Old quantity: "
+                            + cartItem.getQuantity()
+            );
+
+            System.out.println(
+                    "New quantity: "
+                            + newQuantity
+            );
+
             if (newQuantity >
                     variant.getStockQuantity()) {
 
@@ -120,16 +173,11 @@ public class CartServiceImpl implements CartService {
 
         } else {
 
-            if (quantity >
-                    variant.getStockQuantity()) {
+            System.out.println(
+                    "Cart item does not exist. Creating new cart item."
+            );
 
-                throw new RuntimeException(
-                        "Requested quantity exceeds available stock"
-                );
-            }
-
-            cartItem =
-                    new CartItemEntity();
+            cartItem = new CartItemEntity();
 
             cartItem.setCart(cart);
             cartItem.setProductVariant(variant);
@@ -140,24 +188,62 @@ public class CartServiceImpl implements CartService {
 
         cartItemRepository.save(cartItem);
 
-        return buildCartResponse(
-                cart,
-                "Product added to cart successfully"
+        System.out.println(
+                "Cart item saved successfully. Cart Item ID: "
+                        + cartItem.getCartItemId()
         );
+
+        System.out.println(
+                "BUILDING CART RESPONSE..."
+        );
+
+        CartResponse response =
+                buildCartResponse(
+                        cart,
+                        "Product added to cart successfully"
+                );
+
+        System.out.println(
+                "ADD TO CART SUCCESS"
+        );
+
+        System.out.println(
+                "Cart ID: " + response.getCartId()
+        );
+
+        System.out.println(
+                "Number of items: "
+                        + response.getItems().size()
+        );
+
+        System.out.println("======================================");
+
+        return response;
     }
 
+    // =========================================================
+    // GET MY CART
+    // =========================================================
     @Override
     @Transactional(readOnly = true)
     public CartResponse getMyCart() {
 
+        System.out.println("======================================");
+        System.out.println("GET MY CART SERVICE CALLED");
+
         String email = getLoggedInEmail();
+
+        System.out.println(
+                "Logged-in email: " + email
+        );
 
         UserEntity user =
                 userRepository
                         .findByEmail(email)
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                        "User not found"
+                                        "User not found with email: "
+                                                + email
                                 )
                         );
 
@@ -167,6 +253,11 @@ public class CartServiceImpl implements CartService {
                         .orElse(null);
 
         if (cart == null) {
+
+            System.out.println(
+                    "No cart found for user."
+            );
+
             return new CartResponse(
                     null,
                     "Cart is empty",
@@ -175,12 +266,20 @@ public class CartServiceImpl implements CartService {
             );
         }
 
+        System.out.println(
+                "Cart found. Cart ID: "
+                        + cart.getCartId()
+        );
+
         return buildCartResponse(
                 cart,
                 "Cart fetched successfully"
         );
     }
 
+    // =========================================================
+    // UPDATE QUANTITY
+    // =========================================================
     @Override
     public CartResponse updateQuantity(
             Long cartItemId,
@@ -213,8 +312,6 @@ public class CartServiceImpl implements CartService {
                                 )
                         );
 
-        // Security check:
-        // cart item must belong to logged-in user
         if (!item.getCart()
                 .getUser()
                 .getUserId()
@@ -228,8 +325,8 @@ public class CartServiceImpl implements CartService {
         ProductVariantEntity variant =
                 item.getProductVariant();
 
-        if (quantity >
-                variant.getStockQuantity()) {
+        if (variant.getStockQuantity() == null ||
+                quantity > variant.getStockQuantity()) {
 
             throw new RuntimeException(
                     "Requested quantity exceeds available stock"
@@ -246,6 +343,9 @@ public class CartServiceImpl implements CartService {
         );
     }
 
+    // =========================================================
+    // REMOVE FROM CART
+    // =========================================================
     @Override
     public CartResponse removeFromCart(
             Long cartItemId
@@ -283,9 +383,9 @@ public class CartServiceImpl implements CartService {
 
         CartEntity cart = item.getCart();
 
-        cart.getCartItems().remove(item);
-
         cartItemRepository.delete(item);
+
+        cart.getCartItems().remove(item);
 
         return buildCartResponse(
                 cart,
@@ -293,6 +393,9 @@ public class CartServiceImpl implements CartService {
         );
     }
 
+    // =========================================================
+    // CLEAR CART
+    // =========================================================
     @Override
     public CartResponse clearCart() {
 
@@ -313,6 +416,7 @@ public class CartServiceImpl implements CartService {
                         .orElse(null);
 
         if (cart == null) {
+
             return new CartResponse(
                     null,
                     "Cart is already empty",
@@ -321,9 +425,9 @@ public class CartServiceImpl implements CartService {
             );
         }
 
-        cart.getCartItems().clear();
+        cartItemRepository.deleteByCart(cart);
 
-        cartRepository.save(cart);
+        cart.getCartItems().clear();
 
         return new CartResponse(
                 cart.getCartId(),
@@ -333,26 +437,42 @@ public class CartServiceImpl implements CartService {
         );
     }
 
+    // =========================================================
+    // GET LOGGED-IN EMAIL
+    // =========================================================
     private String getLoggedInEmail() {
 
-        return SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
+        String email =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getName();
+
+        System.out.println("======================================");
+        System.out.println("CURRENT AUTHENTICATED USER");
+        System.out.println("Email/Username: " + email);
+        System.out.println("======================================");
+
+        return email;
     }
 
+    // =========================================================
+    // BUILD CART RESPONSE
+    // =========================================================
     private CartResponse buildCartResponse(
             CartEntity cart,
             String message
     ) {
+
+        List<CartItemEntity> cartItems =
+                cartItemRepository.findByCart(cart);
 
         List<CartItemResponse> items =
                 new ArrayList<>();
 
         double total = 0.0;
 
-        for (CartItemEntity item :
-                cart.getCartItems()) {
+        for (CartItemEntity item : cartItems) {
 
             ProductVariantEntity variant =
                     item.getProductVariant();
@@ -362,14 +482,23 @@ public class CartServiceImpl implements CartService {
                             ? 0.0
                             : variant.getPrice();
 
+            int quantity =
+                    item.getQuantity() == null
+                            ? 0
+                            : item.getQuantity();
+
             double subtotal =
-                    price * item.getQuantity();
+                    price * quantity;
 
             CartItemResponse response =
                     new CartItemResponse();
 
             response.setCartItemId(
                     item.getCartItemId()
+            );
+
+            response.setCartId(
+                    cart.getCartId()
             );
 
             response.setVariantId(
@@ -391,13 +520,35 @@ public class CartServiceImpl implements CartService {
                             .getBrand()
             );
 
-            response.setPrice(price);
+            response.setSku(
+                    variant.getSku()
+            );
+
+            response.setColor(
+                    variant.getColor()
+            );
+
+            response.setSize(
+                    variant.getSize()
+            );
+
+            response.setPrice(
+                    price
+            );
 
             response.setQuantity(
-                    item.getQuantity()
+                    quantity
+            );
+
+            response.setStockQuantity(
+                    variant.getStockQuantity()
             );
 
             response.setSubtotal(
+                    subtotal
+            );
+
+            response.setTotalPrice(
                     subtotal
             );
 

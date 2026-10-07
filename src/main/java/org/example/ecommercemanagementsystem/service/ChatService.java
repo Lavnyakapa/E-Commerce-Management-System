@@ -1,4 +1,6 @@
 package org.example.ecommercemanagementsystem.service;
 
-public class ChatService {
+public interface ChatService {
+
+    String getAIResponse(String message);
 }
