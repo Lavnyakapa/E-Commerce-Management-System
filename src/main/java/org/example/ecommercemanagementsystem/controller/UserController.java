@@ -73,7 +73,7 @@ public class UserController {
 
 
     // =========================================
-    // ACTIVATE / DEACTIVATE USER
+    // ACTIVATE / DEACTIVATE USER/sampletest
     // =========================================
 
     @PatchMapping("/{userId}/status")
